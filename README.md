@@ -1,12 +1,12 @@
-# DeChama: Because Trusting Your Cousin with the Money is So 2010.
+# ImpactChain: Because Trusting Your Cousin with the Money is So 2010.
 
-Welcome to **DeChama**, the decentralized platform that takes the "drama" out of your "Chama". We are revolutionizing traditional savings circles (Chamas) by putting them on the blockchain. Why? Because math doesn't lie, but Dave from accounting might.
+Welcome to **ImpactChain**, the decentralized platform that takes the "drama" out of your "Chama". We are revolutionizing traditional savings circles (Chamas) by putting them on the blockchain. Why? Because math doesn't lie, but Chad from accounting might.
 
 ## What is this thing?
 
-DeChama is a platform that lets you create, manage, and participate in savings circles using Bitcoin (via Stacks). It's transparent, secure, and ensures that when it's your turn to eat, the pot helps you feast, not famine.
+ImpactChain is a platform that lets you create, manage, and participate in savings circles using Bitcoin (via Stacks). It's transparent, secure, and ensures that when it's your turn to eat, the pot helps you feast, not famine.
 
-We handle the messy stuff—ledger tracking, contribution windows, voting on loans—so you can focus on the important stuff: arguing about where to meet for lunch.
+We handle the messy stuff-ledger tracking, contribution windows, voting on loans-so you can focus on the important stuff: arguing about where to meet for lunch.
 
 ## Key Features
 
