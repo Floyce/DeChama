@@ -70,9 +70,12 @@ const BrowseChamasPage = () => {
     return (
         <Box py={10}>
             <Container maxW="container.xl">
+                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={4} onClick={() => navigate('/dashboard')}>
+                    Back to Dashboard
+                </Button>
                 <VStack spacing={4} align="start" mb={8}>
-                    <Heading size="lg">Browse Chamas</Heading>
-                    <Text color="gray.500">Find a community that matches your goals.</Text>
+                    <Heading size="lg">Discover Communities</Heading>
+                    <Text color="gray.500">Find the perfect Chama. Join forces, save together.</Text>
                 </VStack>
 
                 {/* Filters */}
@@ -125,11 +128,18 @@ const BrowseChamasPage = () => {
 
                                     <Button
                                         w="full"
+                                        size="lg"
+                                        rounded="full"
                                         colorScheme={status === 'member' ? 'green' : (status === 'pending' ? 'yellow' : 'purple')}
                                         variant={status === 'member' ? 'outline' : 'solid'}
                                         onClick={() => status === 'none' && handleJoin(chama.name)}
                                         isDisabled={status !== 'none'}
                                         leftIcon={status === 'member' ? <FaCheckCircle /> : (status === 'pending' ? <FaClock /> : <FaPlus />)}
+                                        _hover={status === 'none' ? {
+                                            transform: 'translateY(-2px)',
+                                            shadow: 'md'
+                                        } : {}}
+                                        transition="all 0.2s"
                                     >
                                         {status === 'member' ? 'Joined' : (status === 'pending' ? 'Pending Approval' : 'Request to Join')}
                                     </Button>

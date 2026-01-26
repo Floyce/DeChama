@@ -1,6 +1,6 @@
 import React from 'react'
-import { Box, Container, Heading, Text, Button, SimpleGrid, Icon, VStack, Flex, useColorModeValue } from '@chakra-ui/react'
-import { FaBitcoin, FaHandshake, FaLock, FaUsers } from 'react-icons/fa'
+import { Box, Container, Heading, Text, Button, SimpleGrid, Icon, VStack, Flex, useColorModeValue, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, useDisclosure } from '@chakra-ui/react'
+import { FaBitcoin, FaHandshake, FaLock, FaUsers, FaPlus, FaArrowRight } from 'react-icons/fa'
 import { Link as RouterLink } from 'react-router-dom'
 
 import { useWallet } from '../context/WalletContext'
@@ -32,26 +32,13 @@ const LandingPage = () => {
     const { connectWallet, isConnected, myChamas, setActiveChama } = useWallet()
     const navigate = useNavigate()
 
-    const [isRedirecting, setIsRedirecting] = React.useState(false)
-
-    const handleGetStarted = async () => {
-        if (!isConnected) {
-            await connectWallet()
-        }
-        setIsRedirecting(true)
+    const handleGetStarted = () => {
+        navigate('/auth')
     }
 
-    // Smart Redirect Logic
-    React.useEffect(() => {
-        if (isConnected && isRedirecting) {
-            if (myChamas.length > 0) {
-                setActiveChama(myChamas[0])
-                navigate('/dashboard')
-            } else {
-                navigate('/hub')
-            }
-        }
-    }, [isConnected, isRedirecting, myChamas, navigate, setActiveChama])
+    const { isOpen, onOpen, onClose } = useDisclosure()
+
+
 
 
     return (
@@ -91,11 +78,11 @@ const LandingPage = () => {
                         </Heading>
                         <Text fontSize="xl" opacity={0.8} maxW="2xl" color="gray.300">
                             Transparent, community-owned savings circles powered by Bitcoin.
-                            Replace opaque records with on-chain certainty and gold-standard security.
                         </Text>
+
                         <Flex gap={4} pt={4} direction={{ base: 'column', sm: 'row' }}>
                             <Button
-                                onClick={handleGetStarted}
+                                onClick={onOpen}
                                 size="lg"
                                 rounded="full"
                                 bgGradient="linear(to-r, brand.500, brand.600)"
@@ -123,6 +110,56 @@ const LandingPage = () => {
                     </VStack>
                 </Container>
             </Box>
+
+            {/* Get Started Modal */}
+            <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
+                <ModalOverlay backdropFilter='blur(4px)' />
+                <ModalContent p={6} rounded="xl">
+                    <ModalHeader textAlign="center">
+                        <Heading size="lg" color="brand.600">Get Started</Heading>
+                        <Text fontSize="sm" color="gray.500" fontWeight="normal" mt={2}>
+                            Join the future of cooperative savings.
+                        </Text>
+                    </ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        <VStack spacing={4} pb={4}>
+                            <Button
+                                w="full"
+                                size="lg"
+                                h="70px"
+                                colorScheme="purple"
+                                variant="solid"
+                                shadow="md"
+                                _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                                onClick={() => navigate('/auth?tab=signup')}
+                                leftIcon={<Icon as={FaPlus} w={5} h={5} />}
+                            >
+                                <VStack align="start" spacing={0} px={2}>
+                                    <Text fontSize="md">Create New Account</Text>
+                                    <Text fontSize="xs" fontWeight="normal" opacity={0.8}>Start your own savings circle</Text>
+                                </VStack>
+                            </Button>
+                            <Button
+                                w="full"
+                                size="lg"
+                                h="70px"
+                                variant="outline"
+                                colorScheme="purple"
+                                borderColor="purple.200"
+                                _hover={{ bg: 'purple.50', transform: 'translateY(-2px)' }}
+                                onClick={() => navigate('/auth?tab=login')}
+                                leftIcon={<Icon as={FaArrowRight} w={5} h={5} />}
+                            >
+                                <VStack align="start" spacing={0} px={2}>
+                                    <Text fontSize="md">Log In</Text>
+                                    <Text fontSize="xs" fontWeight="normal" color="gray.500">Access your active Chamas</Text>
+                                </VStack>
+                            </Button>
+                        </VStack>
+                    </ModalBody>
+                </ModalContent>
+            </Modal>
 
             {/* Features Section */}
             <Container maxW="container.xl" py={20}>

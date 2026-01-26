@@ -8,6 +8,9 @@ ImpactChain is a platform that lets you create, manage, and participate in savin
 
 We handle the messy stuff-ledger tracking, contribution windows, voting on loans-so you can focus on the important stuff: arguing about where to meet for lunch.
 
+## User Flow Diagram
+![User Flow Diagram](docs/user-flow.png)
+
 ## Key Features
 
 ### Hybrid Authentication (The "Best of Both Worlds" Part)

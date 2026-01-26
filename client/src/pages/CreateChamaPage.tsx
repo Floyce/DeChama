@@ -92,6 +92,41 @@ const CreateChamaPage = () => {
         proposalCategories: ['Loans', 'Membership', 'Rules']
     })
 
+    const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle')
+
+    const handleEmailValidation = async () => {
+        if (!formData.inviteEmails) return
+        setEmailStatus('checking')
+
+        const emails = formData.inviteEmails.split(',').map(e => e.trim())
+        let allValid = true
+
+        // Check only last one as sample or check them all? Let's check the first non-empty
+        const sampleEmail = emails[0]
+        if (!sampleEmail) {
+            setEmailStatus('idle')
+            return
+        }
+
+        try {
+            const res = await fetch('/api/validate-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: sampleEmail })
+            })
+            const data = await res.json()
+            if (data.valid) {
+                setEmailStatus('valid')
+            } else {
+                setEmailStatus('invalid')
+                toast({ title: 'Invalid Email', description: data.reason, status: 'warning' })
+            }
+        } catch (e) {
+            console.error(e)
+            setEmailStatus('idle')
+        }
+    }
+
     const updateField = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }))
     }
@@ -100,6 +135,12 @@ const CreateChamaPage = () => {
     const handleBack = () => setActiveStep(prev => prev - 1)
 
     const handleDeploy = async () => {
+        // Auth check (must have user)
+        const userStr = localStorage.getItem('impactchain_user')
+        if (!userStr) return
+
+        const user = JSON.parse(userStr)
+
         // Step 6: Connect Wallet logic
         if (!isConnected) {
             try {
@@ -112,20 +153,41 @@ const CreateChamaPage = () => {
         }
 
         setIsDeploying(true)
-        setTimeout(() => {
-            setIsDeploying(false)
-            setMyChamas(prev => [...prev, formData.name])
-            setActiveChama(formData.name)
 
-            toast({
-                title: 'Chama Created Successfully!',
-                description: `Smart Contract Deployed. Fee paid.`,
-                status: 'success',
-                duration: 5000,
-                isClosable: true,
+        try {
+            // BACKEND CALL
+            const res = await fetch('/api/chamas/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...formData,
+                    userId: user.id
+                })
             })
-            navigate('/dashboard')
-        }, 2000)
+            const data = await res.json()
+
+            if (data.success) {
+                // Update Context
+                setMyChamas(prev => [...prev, formData.name])
+                setActiveChama(formData.name)
+
+                toast({
+                    title: 'Chama Created Successfully!',
+                    description: `Smart Contract Deployed. Fee paid.`,
+                    status: 'success',
+                    duration: 5000,
+                    isClosable: true,
+                })
+                navigate(`/chama/${encodeURIComponent(formData.name)}`)
+            } else {
+                toast({ title: 'Error creating Chama', description: data.error, status: 'error' })
+            }
+
+        } catch (error) {
+            toast({ title: 'Creation Failed', status: 'error' })
+        } finally {
+            setIsDeploying(false)
+        }
     }
 
     const renderStepContent = (stepIndex: number) => {
@@ -171,14 +233,22 @@ const CreateChamaPage = () => {
                         </FormControl>
                         <FormControl>
                             <FormLabel>Invite Members</FormLabel>
-                            <Text fontSize="xs" color="gray.500" mb={2}>Enter email addresses separated by commas to send invites.</Text>
+                            <Text fontSize="xs" color="gray.500" mb={1}>Enter email addresses separated by commas to send invites.</Text>
+                            <Text fontSize="xs" color="purple.600" mb={2} fontWeight="medium">
+                                🔒 Privacy Note: Emails are only used to send the invite link. Members will join using their chosen Pseudonyms.
+                            </Text>
                             <Textarea
                                 value={formData.inviteEmails}
                                 onChange={(e) => updateField('inviteEmails', e.target.value)}
+                                onBlur={handleEmailValidation}
                                 placeholder="alice@example.com, bob@example.com"
                                 size="sm"
                                 rows={3}
+                                borderColor={emailStatus === 'valid' ? 'green.400' : emailStatus === 'invalid' ? 'red.400' : 'inherit'}
                             />
+                            {emailStatus === 'checking' && <Text fontSize="xs" color="blue.500">Checking email domain...</Text>}
+                            {emailStatus === 'valid' && <Flex align="center" gap={1} color="green.500" fontSize="xs"><Icon as={FaCheck} /> Emails valid</Flex>}
+                            {emailStatus === 'invalid' && <Text fontSize="xs" color="red.500">One or more emails has an invalid domain.</Text>}
                         </FormControl>
                         <Flex align="center" justify="space-between">
                             <FormLabel mb={0}>Enable Referral Rewards?</FormLabel>
@@ -290,11 +360,11 @@ const CreateChamaPage = () => {
                         </Box>
 
                         {!isConnected ? (
-                            <Button onClick={connectWallet} colorScheme="orange" leftIcon={<FaWallet />}>
+                            <Button onClick={connectWallet} colorScheme="orange" size="lg" rounded="full" leftIcon={<FaWallet />}>
                                 Connect Wallet to Deploy
                             </Button>
                         ) : (
-                            <Button onClick={handleDeploy} colorScheme="purple" size="lg" isLoading={isDeploying} loadingText="Deploying Contract...">
+                            <Button onClick={handleDeploy} colorScheme="purple" size="lg" rounded="full" isLoading={isDeploying} loadingText="Deploying Contract...">
                                 DEPLOY SMART CONTRACT
                             </Button>
                         )}
@@ -308,8 +378,8 @@ const CreateChamaPage = () => {
     return (
         <Box py={10}>
             <Container maxW="container.lg">
-                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => navigate('/hub')}>
-                    Back to Hub
+                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => navigate('/dashboard')}>
+                    Back to Dashboard
                 </Button>
 
                 <VStack spacing={8} align="stretch">
@@ -359,8 +429,14 @@ const CreateChamaPage = () => {
                             <Button
                                 onClick={handleNext}
                                 colorScheme="purple"
+                                size="lg"
+                                rounded="full"
+                                px={8}
                                 rightIcon={<FaArrowRight />}
-                                isDisabled={activeStep === 0 && !formData.name} // Basic validation example
+                                isDisabled={
+                                    (activeStep === 0 && !formData.name) ||
+                                    (activeStep === 1 && (emailStatus === 'invalid' || emailStatus === 'checking'))
+                                }
                             >
                                 Next Step
                             </Button>

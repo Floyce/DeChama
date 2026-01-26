@@ -13,92 +13,86 @@ import {
     ModalOverlay,
     ModalContent,
     ModalHeader,
+    ModalFooter,
     ModalBody,
     ModalCloseButton,
-    ModalFooter,
-    useDisclosure
+    useDisclosure,
+    List,
+    ListItem,
+    ListIcon
 } from '@chakra-ui/react'
-import { FaQuestion, FaKey, FaBolt, FaUsers, FaArrowLeft, FaBookOpen } from 'react-icons/fa'
+import { FaQuestion, FaKey, FaBolt, FaUsers, FaArrowLeft, FaCheckCircle, FaBookOpen } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
 
-const modules = [
+interface Module {
+    icon: any
+    title: string
+    desc: string
+    content: string[]
+}
+
+const modules: Module[] = [
     {
         icon: FaQuestion,
         title: 'What is Bitcoin?',
         desc: 'Bitcoin is decentralized digital money that no one controls. It is secure, scarce, and open to everyone.',
-        content: `
-            Bitcoin is the first decentralized digital currency. It works without a central bank or single administrator. 
-            
-            Key Concepts:
-            • Decentralization: No one owns or controls Bitcoin.
-            • Scarcity: There will only ever be 21 million Bitcoins.
-            • Security: It uses cryptography to secure transactions.
-            
-            Why it matters for Chamas:
-            It allows your group to hold money that cannot be devalued by inflation or seized by bad actors.
-        `
+        content: [
+            'Bitcoin (BTC) was created in 2009 by Satoshi Nakamoto.',
+            'It is the first decentralized cryptocurrency, meaning no government or bank controls it.',
+            'There will only ever be 21 million Bitcoins, making it scarce like digital gold.',
+            'Transactions are recorded on a public ledger called the Blockchain.'
+        ]
     },
     {
         icon: FaKey,
         title: 'What is a Wallet?',
         desc: 'A wallet stores your private keys, which are like passwords that give you access to your Bitcoin.',
-        content: `
-            A Bitcoin wallet doesn't store money like a physical wallet. Instead, it stores the "Keys" (Secret Codes) that allow you to move your money on the blockchain.
-            
-            Types of Wallets:
-            • Hot Wallets (Mobile/Desktop): Convenient for daily spending (like M-Pesa).
-            • Cold Wallets (Hardware): Best for long-term savings (like a Vault).
-            
-            Important: If you lose your keys, you lose your Bitcoin. Always backup your seed phrase!
-        `
+        content: [
+            'A wallet does not store coins; it stores the keys to move them on the blockchain.',
+            'Private Key: Your secret password. NEVER share this.',
+            'Public Key: Your "account number" or address. You can share this to receive money.',
+            'Self-Custody: "Not your keys, not your coins." Holding your own keys gives you true ownership.'
+        ]
     },
     {
         icon: FaBolt,
         title: 'What is Lightning?',
         desc: 'The Lightning Network makes Bitcoin transactions fast and cheap, perfect for everyday payments.',
-        content: `
-            The Bitcoin main chain is like a bank settlement layer - very secure but sometimes slow/expensive.
-            
-            The Lightning Network is a layer on top of Bitcoin that allows for instant, near-zero fee transactions. 
-            
-            • Perfect for Chama contributions.
-            • Works instantly across borders.
-            • Settles finally on the main Bitcoin blockchain.
-        `
+        content: [
+            'The main Bitcoin network (Layer 1) can be slow and expensive for small coffee payments.',
+            'Lightning (Layer 2) works on top of Bitcoin to enable instant, near-zero fee transactions.',
+            'It is perfect for monthly Chama contributions and daily spending.',
+            'Our platform uses Lightning to ensure you don\'t lose money to network fees.'
+        ]
     },
     {
         icon: FaUsers,
         title: 'Why Bitcoin for Chamas?',
         desc: 'Bitcoin provides transparency and security, ensuring that group funds are safe and verifiable by all members.',
-        content: `
-            Traditional Chamas face risks:
-            • Theft by treasurers.
-            • Bank fees and delays.
-            • Lack of transparency.
-            
-            DeChama solves this:
-            • Multi-sig wallets mean no single person can steal funds.
-            • The ledger is public - everyone can audit the pot in real-time.
-            • Money grows in value over long term (historically) vs fiat currency devaluation.
-        `
+        content: [
+            'Transparency: Every member can verify the group balance on the blockchain.',
+            'Security: Multi-signature (MultiSig) wallets require multiple people to approve a withdrawal.',
+            'No Middlemen: No bank freezing your account or charging hidden maintenance fees.',
+            'Inflation Hedge: Saving in Bitcoin protects your group\'s purchasing power over long periods.'
+        ]
     },
 ]
 
 const LearnPage = () => {
     const navigate = useNavigate()
     const { isOpen, onOpen, onClose } = useDisclosure()
-    const [selectedModule, setSelectedModule] = useState<any>(null)
+    const [selectedModule, setSelectedModule] = useState<Module | null>(null)
 
-    const handleOpen = (mod: any) => {
+    const handleReadMore = (mod: Module) => {
         setSelectedModule(mod)
         onOpen()
     }
 
     return (
-        <Box py={10}>
+        <Box py={20}>
             <Container maxW="container.xl">
-                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => navigate(-1)}>
-                    Back
+                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={8} onClick={() => navigate('/')}>
+                    Back Home
                 </Button>
 
                 <VStack spacing={8} mb={16} textAlign="center">
@@ -120,43 +114,60 @@ const LearnPage = () => {
                             shadow="md"
                             borderWidth="1px"
                             borderColor="gray.100"
-                            _hover={{ shadow: 'xl', transform: 'translateY(-4px)' }}
-                            transition="all 0.2s"
-                            cursor="pointer"
-                            onClick={() => handleOpen(mod)}
+                            _hover={{ shadow: 'xl' }}
                         >
                             <Flex mb={4} align="center">
                                 <Box bg="purple.50" p={3} rounded="xl" color="purple.500" mr={4}>
                                     <Icon as={mod.icon} w={6} h={6} />
                                 </Box>
-                                <Heading size="md" color="gray.700">{mod.title}</Heading>
+                                <Heading size="md">{mod.title}</Heading>
                             </Flex>
                             <Text color="gray.600" mb={6}>
                                 {mod.desc}
                             </Text>
-                            <Button variant="outline" colorScheme="purple" size="sm" rightIcon={<FaBookOpen />}>
-                                Read Guide
+                            <Button
+                                variant="outline"
+                                colorScheme="purple"
+                                size="sm"
+                                onClick={() => handleReadMore(mod)}
+                                leftIcon={<FaBookOpen />}
+                            >
+                                Read More
                             </Button>
                         </Box>
                     ))}
                 </SimpleGrid>
 
                 {/* Content Modal */}
-                <Modal isOpen={isOpen} onClose={onClose} size="xl" scrollBehavior="inside">
-                    <ModalOverlay backdropFilter="blur(5px)" />
+                <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+                    <ModalOverlay backdropFilter='blur(2px)' />
                     <ModalContent>
-                        <ModalHeader display="flex" alignItems="center" gap={3}>
-                            {selectedModule && <Icon as={selectedModule.icon} color="purple.500" />}
-                            {selectedModule?.title}
+                        <ModalHeader>
+                            <Flex align="center" gap={3}>
+                                <Icon as={selectedModule?.icon} color="purple.500" />
+                                <Text>{selectedModule?.title}</Text>
+                            </Flex>
                         </ModalHeader>
                         <ModalCloseButton />
                         <ModalBody pb={6}>
-                            <Text whiteSpace="pre-line" lineHeight="tall" color="gray.600">
-                                {selectedModule?.content}
-                            </Text>
+                            <VStack align="start" spacing={4}>
+                                <Text fontWeight="bold" color="gray.700">
+                                    {selectedModule?.desc}
+                                </Text>
+                                <List spacing={3}>
+                                    {selectedModule?.content.map((point, i) => (
+                                        <ListItem key={i} display="flex" alignItems="start">
+                                            <ListIcon as={FaCheckCircle} color="green.500" mt={1} />
+                                            {point}
+                                        </ListItem>
+                                    ))}
+                                </List>
+                            </VStack>
                         </ModalBody>
-                        <ModalFooter>
-                            <Button colorScheme="purple" onClick={onClose}>Close</Button>
+                        <ModalFooter bg="gray.50" roundedBottom="md">
+                            <Button colorScheme="purple" mr={3} onClick={onClose}>
+                                Got it
+                            </Button>
                         </ModalFooter>
                     </ModalContent>
                 </Modal>

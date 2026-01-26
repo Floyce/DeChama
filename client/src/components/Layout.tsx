@@ -1,6 +1,6 @@
 import React from 'react'
-import { Box, Flex, Heading, Button, Container, Text, Link, Menu, MenuButton, MenuList, MenuItem, Icon, Avatar, HStack } from '@chakra-ui/react'
-import { Outlet, Link as RouterLink, useLocation } from 'react-router-dom'
+import { Box, Flex, Heading, Button, Container, Text, Link, Menu, MenuButton, MenuList, MenuItem, Icon, Avatar, HStack, Divider, Select } from '@chakra-ui/react'
+import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
 import { FaChevronDown, FaWallet, FaUserCircle } from 'react-icons/fa'
 import { useWallet } from '../context/WalletContext'
 
@@ -8,22 +8,23 @@ import { useAuth } from '../context/AuthContext'
 
 const Navbar = () => {
     const location = useLocation()
-    const { isConnected, connectWallet, address, myChamas, disconnectWallet } = useWallet()
+    const navigate = useNavigate()
+    const { isConnected, connectWallet, address, myChamas, disconnectWallet, currency, setCurrency } = useWallet()
     const { user, isAuthenticated, logout } = useAuth()
 
     const isActive = (path: string) => {
-        return location.pathname === path ? 'primary.main' : 'gray.600'
+        return location.pathname === path ? 'purple.600' : 'gray.600'
     }
 
     const isActiveBg = (path: string) => {
-        return location.pathname === path ? 'primary.50' : 'transparent'
+        return location.pathname === path ? 'purple.50' : 'transparent'
     }
 
     return (
         <Box bg="white" px={4} boxShadow="sm" position="sticky" top={0} zIndex={10}>
             <Container maxW="container.xl">
                 <Flex h={16} alignItems="center" justifyContent="space-between">
-                    <Heading size="md" color="primary.main" letterSpacing="tight" as={RouterLink} to="/">
+                    <Heading size="md" color="purple.600" letterSpacing="tight" as={RouterLink} to="/">
                         ImpactChain
                     </Heading>
 
@@ -36,7 +37,7 @@ const Navbar = () => {
                             color={isActive('/')}
                             px={3} py={1} rounded="md"
                             bg={isActiveBg('/')}
-                            _hover={{ color: 'primary.main', bg: 'primary.50' }}
+                            _hover={{ color: 'purple.600', bg: 'purple.50' }}
                         >
                             Home
                         </Link>
@@ -47,7 +48,7 @@ const Navbar = () => {
                             color={isActive('/learn')}
                             px={3} py={1} rounded="md"
                             bg={isActiveBg('/learn')}
-                            _hover={{ color: 'primary.main', bg: 'primary.50' }}
+                            _hover={{ color: 'purple.600', bg: 'purple.50' }}
                         >
                             Learn
                         </Link>
@@ -61,17 +62,39 @@ const Navbar = () => {
                                 <MenuList>
                                     {myChamas.length > 0 ? (
                                         myChamas.map((chama, idx) => (
-                                            <MenuItem key={idx} as={RouterLink} to="/dashboard">{chama}</MenuItem>
+                                            <MenuItem key={idx} as={RouterLink} to={`/chama/${encodeURIComponent(chama)}`}>
+                                                {chama}
+                                            </MenuItem>
                                         ))
                                     ) : (
                                         <MenuItem isDisabled>No Chamas joined</MenuItem>
                                     )}
-                                    <MenuItem as={RouterLink} to="/hub">Chama Hub</MenuItem>
+                                    <Divider />
+                                    <MenuItem as={RouterLink} to="/dashboard">View All (Dashboard)</MenuItem>
                                 </MenuList>
                             </Menu>
                         )}
 
                         <Flex gap={2} align="center">
+                            {/* Currency Selector */}
+                            {isAuthenticated && (
+                                <Select
+                                    size="sm"
+                                    w="80px"
+                                    rounded="md"
+                                    variant="outline"
+                                    value={currency}
+                                    onChange={(e) => setCurrency(e.target.value)}
+                                    color="gray.600"
+                                    borderColor="gray.200"
+                                >
+                                    <option value="KES">🇰🇪 KES</option>
+                                    <option value="USD">🇺🇸 USD</option>
+                                    <option value="UGX">🇺🇬 UGX</option>
+                                    <option value="TZS">🇹🇿 TZS</option>
+                                </Select>
+                            )}
+
                             {/* Wallet Connection */}
                             {isConnected ? (
                                 <Button size="sm" variant="outline" colorScheme="orange" leftIcon={<FaWallet />} onClick={disconnectWallet}>
@@ -97,7 +120,7 @@ const Navbar = () => {
                                     <MenuList>
                                         <MenuItem>Ref: {user?.referralCode}</MenuItem>
                                         <MenuItem as={RouterLink} to="/dashboard">Dashboard</MenuItem>
-                                        <MenuItem onClick={() => { logout(); disconnectWallet(); }}>Logout</MenuItem>
+                                        <MenuItem onClick={() => { logout(); disconnectWallet(); navigate('/'); }}>Logout</MenuItem>
                                     </MenuList>
                                 </Menu>
                             ) : (

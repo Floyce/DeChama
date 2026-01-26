@@ -9,7 +9,9 @@ import GovernancePage from './pages/GovernancePage'
 import AuthPage from './pages/AuthPage'
 import CreateChamaPage from './pages/CreateChamaPage'
 import BrowseChamasPage from './pages/BrowseChamasPage'
-import HubPage from './pages/HubPage'
+import ChamaDetails from './pages/ChamaDetails'
+import SoloSavingsPage from './pages/SoloSavingsPage'
+import WelcomePage from './pages/WelcomePage'
 
 function App() {
     return (
@@ -24,11 +26,15 @@ function App() {
                     <Route index element={<LandingPage />} />
                     <Route path="learn" element={<LearnPage />} />
                     <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="hub" element={<HubPage />} />
+                    <Route path="chama/:chamaName" element={<ChamaDetails />} />
+
+                    {/* Routes that assume active chama context or are general */}
                     <Route path="contribution" element={<ContributionPage />} />
                     <Route path="governance" element={<GovernancePage />} />
                     <Route path="create-chama" element={<CreateChamaPage />} />
                     <Route path="browse-chamas" element={<BrowseChamasPage />} />
+                    <Route path="solo-savings" element={<SoloSavingsPage />} />
+                    <Route path="welcome" element={<WelcomePage />} />
                 </Route>
             </Routes>
         </Router>

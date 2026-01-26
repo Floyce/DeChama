@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { FaArrowLeft } from 'react-icons/fa'
 import {
     Box,
     Button,
@@ -16,9 +17,10 @@ import {
     Tab,
     TabPanel,
     useToast,
-    Link
+    Link,
+    Select
 } from '@chakra-ui/react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWallet } from '../context/WalletContext'
 
@@ -28,11 +30,13 @@ const AuthPage = () => {
     const navigate = useNavigate()
     const toast = useToast()
 
-    const [email, setEmail] = useState('')
+    const [phoneNumber, setPhoneNumber] = useState('')
+    const [countryCode, setCountryCode] = useState('+254')
     const [password, setPassword] = useState('')
 
     // Cleanup States
-    const [signupEmail, setSignupEmail] = useState('')
+    const [signupPhoneNumber, setSignupPhoneNumber] = useState('')
+    const [signupCountryCode, setSignupCountryCode] = useState('+254')
     const [signupPassword, setSignupPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [displayName, setDisplayName] = useState('')
@@ -41,21 +45,30 @@ const AuthPage = () => {
     const [isLoading, setIsLoading] = useState(false)
 
     // Smart Redirect Logic
+    // Smart Redirect Logic
     useEffect(() => {
         if (isAuthenticated) {
-            // Check Wallet Context or just go to Hub?
-            // "After login -> User's dashboard hub"
-            // If they have chamas (from previous session mock), go to Dashboard?
-            // User requested: "After login -> User's dashboard hub"
-            // Assuming Hub is the 'HubPage'
-            navigate('/hub')
+            // "Smart Redirect" based on User Flow Architecture
+            if (!myChamas || myChamas.length === 0) {
+                // New User or No Groups -> Go to Welcome/Choice Page
+                navigate('/welcome')
+            } else if (myChamas.length === 1) {
+                // ONE active Chama -> Go directly to that Chama's detail page
+                const targetChama = myChamas[0]
+                setActiveChama(targetChama)
+                navigate(`/chama/${encodeURIComponent(targetChama)}`)
+            } else {
+                // MULTIPLE active Chamas -> Go to Dashboard
+                navigate('/dashboard')
+            }
         }
-    }, [isAuthenticated, navigate])
+    }, [isAuthenticated, myChamas, navigate, setActiveChama])
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
-        await login(email, password)
+        const fullPhone = countryCode + phoneNumber.replace(/^0+/, '') // Remove leading zero if present
+        await login(fullPhone, password)
         setIsLoading(false)
     }
 
@@ -66,9 +79,13 @@ const AuthPage = () => {
             return
         }
         setIsLoading(true)
-        await signup(signupEmail, signupPassword, displayName, referralCode)
+        const fullPhone = signupCountryCode + signupPhoneNumber.replace(/^0+/, '')
+        await signup(fullPhone, signupPassword, displayName, referralCode)
         setIsLoading(false)
     }
+
+    const [searchParams] = useSearchParams()
+    const defaultTab = searchParams.get('tab') === 'signup' ? 1 : 0
 
     return (
         <Flex minH="80vh" align="center" justify="center" bg="gray.50">
@@ -81,12 +98,16 @@ const AuthPage = () => {
                     border="1px solid"
                     borderColor="purple.100"
                 >
+                    <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={4} onClick={() => navigate('/')} alignSelf="flex-start">
+                        Back to Home
+                    </Button>
+
                     <VStack spacing={6} mb={8} textAlign="center">
                         <Heading size="xl" color="brand.800">Welcome to ImpactChain</Heading>
                         <Text color="gray.500">The transparent, decentralized future of Chamas.</Text>
                     </VStack>
 
-                    <Tabs isFitted variant="enclosed" colorScheme="purple">
+                    <Tabs isFitted variant="enclosed" colorScheme="purple" defaultIndex={defaultTab}>
                         <TabList mb="1em">
                             <Tab fontWeight="bold">LOGIN</Tab>
                             <Tab fontWeight="bold">SIGN UP</Tab>
@@ -97,8 +118,18 @@ const AuthPage = () => {
                                 <form onSubmit={handleLogin}>
                                     <VStack spacing={4}>
                                         <FormControl isRequired>
-                                            <FormLabel>Email</FormLabel>
-                                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" />
+                                            <FormLabel>Phone Number</FormLabel>
+                                            <Flex gap={2}>
+                                                <Select w="110px" value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
+                                                    <option value="+254">🇰🇪 +254</option>
+                                                    <option value="+256">🇺🇬 +256</option>
+                                                    <option value="+255">🇹🇿 +255</option>
+                                                    <option value="+250">🇷🇼 +250</option>
+                                                    <option value="+1">🇺🇸 +1</option>
+                                                    <option value="+44">🇬🇧 +44</option>
+                                                </Select>
+                                                <Input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="700 000 000" flex="1" />
+                                            </Flex>
                                         </FormControl>
                                         <FormControl isRequired>
                                             <FormLabel>Password</FormLabel>
@@ -119,12 +150,25 @@ const AuthPage = () => {
                                 <form onSubmit={handleSignup}>
                                     <VStack spacing={4}>
                                         <FormControl isRequired>
-                                            <FormLabel>Email</FormLabel>
-                                            <Input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="Enter your email" />
+                                            <FormLabel>Phone Number</FormLabel>
+                                            <Flex gap={2}>
+                                                <Select w="110px" value={signupCountryCode} onChange={(e) => setSignupCountryCode(e.target.value)}>
+                                                    <option value="+254">🇰🇪 +254</option>
+                                                    <option value="+256">🇺🇬 +256</option>
+                                                    <option value="+255">🇹🇿 +255</option>
+                                                    <option value="+250">🇷🇼 +250</option>
+                                                    <option value="+1">🇺🇸 +1</option>
+                                                    <option value="+44">🇬🇧 +44</option>
+                                                </Select>
+                                                <Input type="tel" value={signupPhoneNumber} onChange={(e) => setSignupPhoneNumber(e.target.value)} placeholder="700 000 000" flex="1" />
+                                            </Flex>
                                         </FormControl>
                                         <FormControl isRequired>
-                                            <FormLabel>Display Name</FormLabel>
-                                            <Input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. John Doe" />
+                                            <FormLabel>Pseudonym / Public Name</FormLabel>
+                                            <Input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="e.g. CryptoSatoshi" />
+                                            <Text fontSize="xs" color="gray.500" mt={1}>
+                                                This name will be visible to your Chama members. Your real phone number remains private.
+                                            </Text>
                                         </FormControl>
                                         <Flex gap={4} w="full">
                                             <FormControl isRequired>

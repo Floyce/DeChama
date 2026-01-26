@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { useToast } from '@chakra-ui/react'
 
 interface User {
-    email: string
+    phoneNumber: string
     displayName: string
     referralCode: string
     referredBy?: string
@@ -11,8 +11,8 @@ interface User {
 interface AuthContextType {
     user: User | null
     isAuthenticated: boolean
-    login: (email: string, password: string) => Promise<boolean>
-    signup: (email: string, password: string, displayName: string, referralCode?: string) => Promise<boolean>
+    login: (phoneNumber: string, password: string) => Promise<boolean>
+    signup: (phoneNumber: string, password: string, displayName: string, referralCode?: string) => Promise<boolean>
     logout: () => void
     logs: string[]
 }
@@ -40,62 +40,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("Security Log:", logEntry)
     }
 
-    const login = async (email: string, password: string) => {
-        return new Promise<boolean>((resolve) => {
-            setTimeout(() => {
-                if (email && password) {
-                    // Mock Login Success
-                    // In real app: Validate hash, check DB
-                    const mockUser: User = {
-                        email,
-                        displayName: email.split('@')[0], // Default name if not found
-                        referralCode: 'REF-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-                    }
+    const login = async (phoneNumber: string, password: string) => {
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: phoneNumber, password })
+            })
+            const data = await res.json()
 
-                    setUser(mockUser)
-                    localStorage.setItem('impactchain_user', JSON.stringify(mockUser))
-                    logAction(`User logged in: ${email}`)
-
-                    toast({ title: 'Welcome back!', status: 'success' })
-                    resolve(true)
-                } else {
-                    toast({ title: 'Invalid credentials', status: 'error' })
-                    logAction(`Failed login attempt: ${email}`)
-                    resolve(false)
+            if (data.success) {
+                setUser(data.user)
+                // Also save chamas if returned
+                if (data.user.chamas) {
+                    // We might need to handle this in WalletContext or pass it via URL/localstorage intermediate
+                    // Ideally, Auth and Wallet contexts should sync. For now, we save user object which contains it.
                 }
-            }, 1000)
-        })
+                localStorage.setItem('impactchain_user', JSON.stringify(data.user))
+                logAction(`User logged in: ${phoneNumber}`)
+                toast({ title: 'Welcome back!', status: 'success' })
+                return true
+            } else {
+                toast({ title: data.error || 'Login failed', status: 'error' })
+                logAction(`Failed login attempt: ${phoneNumber}`)
+                return false
+            }
+        } catch (error) {
+            toast({ title: 'Network Error', status: 'error' })
+            return false
+        }
     }
 
-    const signup = async (email: string, password: string, displayName: string, referralCode?: string) => {
-        return new Promise<boolean>((resolve) => {
-            setTimeout(() => {
-                const uniqueCode = 'REF-' + Math.random().toString(36).substr(2, 6).toUpperCase()
-                const newUser: User = {
-                    email,
-                    displayName,
-                    referralCode: uniqueCode,
-                    referredBy: referralCode
-                }
+    const signup = async (phoneNumber: string, password: string, displayName: string, referralCode?: string) => {
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phoneNumber, password, displayName, email: phoneNumber + "@placeholder.com" }) // API expects email, using phone as placeholder for now or update schema
+            })
+            const data = await res.json()
 
-                setUser(newUser)
-                localStorage.setItem('impactchain_user', JSON.stringify(newUser))
-                logAction(`New user registered: ${email} (Ref: ${referralCode || 'None'})`)
-
-                toast({
-                    title: 'Account Created',
-                    description: `Your referral code is ${uniqueCode}`,
-                    status: 'success',
-                    duration: 5000,
-                    isClosable: true
-                })
-                resolve(true)
-            }, 1000)
-        })
+            if (data.success) {
+                setUser(data.user)
+                localStorage.setItem('impactchain_user', JSON.stringify(data.user))
+                logAction(`New user registered: ${phoneNumber}`)
+                toast({ title: 'Account Created', status: 'success' })
+                return true
+            } else {
+                toast({ title: data.error || 'Signup failed', status: 'error' })
+                return false
+            }
+        } catch (error) {
+            toast({ title: 'Network Error', status: 'error' })
+            return false
+        }
     }
 
     const logout = () => {
-        logAction(`User logged out: ${user?.email}`)
+        logAction(`User logged out: ${user?.phoneNumber}`)
         setUser(null)
         localStorage.removeItem('impactchain_user')
         toast({ title: 'Logged out', status: 'info' })

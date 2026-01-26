@@ -1,0 +1,110 @@
+{
+  "users": [
+    {
+      "id": "user_1769456974347",
+      "email": "0720538273@placeholder.com",
+      "phone": "0720538273",
+      "password": "12345678",
+      "displayName": "CryptoSatoshi",
+      "chamas": [
+        "chama_1769457108585"
+      ]
+    },
+    {
+      "id": "user_1769457176290",
+      "email": "0787879057@placeholder.com",
+      "phone": "0787879057",
+      "password": "123456",
+      "displayName": "biToshi",
+      "chamas": []
+    },
+    {
+      "id": "user_1769459683254",
+      "email": "+254720538273@placeholder.com",
+      "phone": "+254720538273",
+      "password": "123456",
+      "displayName": "CryptoSatoshi",
+      "chamas": [
+        "chama_1769459776307"
+      ]
+    },
+    {
+      "id": "user_1769459984095",
+      "email": "+254787879057@placeholder.com",
+      "phone": "+254787879057",
+      "password": "wueh",
+      "displayName": "Floyce",
+      "chamas": []
+    },
+    {
+      "id": "user_1769461098710",
+      "email": "+254787879058@placeholder.com",
+      "phone": "+254787879058",
+      "password": "1234567",
+      "displayName": "badgirlfifi",
+      "chamas": []
+    },
+    {
+      "id": "user_1769461291565",
+      "email": "+254787879078@placeholder.com",
+      "phone": "+254787879078",
+      "password": "2222",
+      "displayName": "baddie",
+      "chamas": []
+    }
+  ],
+  "chamas": [
+    {
+      "id": "1",
+      "name": "Chama Alpha",
+      "description": "The first genesis chama.",
+      "expectedMembers": 10,
+      "amount": "0.01 BTC",
+      "balance": "1.45 BTC",
+      "nextPayout": "12 Days",
+      "members": []
+    },
+    {
+      "id": "chama_1769456849209",
+      "name": "Demo4",
+      "description": "Test Real Data",
+      "type": "Social",
+      "amount": "",
+      "frequency": "Monthly",
+      "balance": "0.00 BTC",
+      "members": [
+        null
+      ],
+      "nextPayout": "30 Days",
+      "memberCount": 1
+    },
+    {
+      "id": "chama_1769457108585",
+      "name": "test",
+      "description": "",
+      "type": "Social",
+      "amount": "",
+      "frequency": "Monthly",
+      "balance": "0.00 BTC",
+      "members": [
+        "user_1769456974347"
+      ],
+      "nextPayout": "30 Days",
+      "memberCount": 1
+    },
+    {
+      "id": "chama_1769459776307",
+      "name": "test10",
+      "description": "",
+      "type": "Social",
+      "amount": "",
+      "frequency": "Monthly",
+      "balance": "0.00 BTC",
+      "members": [
+        "user_1769459683254"
+      ],
+      "nextPayout": "30 Days",
+      "memberCount": 1
+    }
+  ]
+}

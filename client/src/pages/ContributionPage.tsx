@@ -1,171 +1,224 @@
-import React, { useState, useEffect } from 'react'
-import { Box, Container, Heading, Text, Card, CardBody, SimpleGrid, Icon, VStack, Button, Input, InputGroup, InputRightAddon, Divider, useToast, Flex, Textarea, Code, HStack, IconButton } from '@chakra-ui/react'
-import { FaBitcoin, FaMobileAlt, FaQrcode, FaCheckCircle, FaArrowLeft, FaCopy } from 'react-icons/fa'
+import React, { useState } from 'react'
+import {
+    Box,
+    Container,
+    Heading,
+    Text,
+    Card,
+    CardBody,
+    VStack,
+    Button,
+    Flex,
+    Icon,
+    Spinner,
+    useToast,
+    Divider,
+    Badge,
+    Image,
+    Alert,
+    AlertIcon
+} from '@chakra-ui/react'
+import { QRCodeSVG } from 'qrcode.react'
+import { FaBitcoin, FaBolt, FaCheckCircle, FaDownload, FaShareAlt, FaArrowLeft } from 'react-icons/fa'
 import { useWallet } from '../context/WalletContext'
-import { QRCodeCanvas } from 'qrcode.react'
 import { useNavigate } from 'react-router-dom'
 
 const ContributionPage = () => {
-    const { isConnected } = useWallet()
+    const { isConnected, connectWallet, formatCurrency } = useWallet()
     const navigate = useNavigate()
-    const [amount, setAmount] = useState('')
-    const [fiatAmount, setFiatAmount] = useState('0')
-    const [message, setMessage] = useState('')
-    const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
     const toast = useToast()
 
-    // Mock Exchange Rate: 1 BTC = 9,500,000 KES (approx)
-    const EXCHANGE_RATE = 9500000
+    // States: 'idle' -> 'invoice' -> 'paid'
+    const [step, setStep] = useState<'idle' | 'invoice' | 'paid'>('idle')
+    const [loading, setLoading] = useState(false)
+    const [invoice, setInvoice] = useState<string | null>(null)
+    const [receiptData, setReceiptData] = useState<any>(null)
 
-    useEffect(() => {
-        if (amount && !isNaN(parseFloat(amount))) {
-            const val = parseFloat(amount) * EXCHANGE_RATE
-            setFiatAmount(val.toLocaleString(undefined, { maximumFractionDigits: 0 }))
-        } else {
-            setFiatAmount('0')
-        }
-    }, [amount])
+    const generateInvoice = async () => {
+        setLoading(true)
+        // Mock API call to LNBits / Lightning Provider
+        setTimeout(() => {
+            const mockInvoice = 'lnbc100n1p3...' + Math.random().toString(36).substring(7)
+            setInvoice(mockInvoice)
+            setLoading(false)
+            setStep('invoice')
 
-    const handleContribute = () => {
-        if (!selectedMethod) {
-            toast({ title: 'Select a payment method', status: 'error' })
-            return
-        }
-        if (!amount) {
-            toast({ title: 'Enter an amount', status: 'error' })
-            return
-        }
-
-        // Mock successful contribution
-        toast({
-            title: 'Contribution Recorded',
-            description: `Processing ${amount} BTC via ${selectedMethod}. Waiting for confirmation...`,
-            status: 'info',
-            duration: 5000,
-            isClosable: true,
-        })
-
-        // redirect to dashboard after delay
-        setTimeout(() => navigate('/dashboard'), 2000)
+            // Simulate Payment Listener
+            simulatePayment()
+        }, 1500)
     }
 
-    const copyInvoice = () => {
-        navigator.clipboard.writeText('lnbc10n1p3j8y7spp...')
-        toast({ title: 'Invoice Copied!', status: 'success', duration: 1500 })
+    const simulatePayment = () => {
+        // In a real app, this would be a websocket or polling
+        setTimeout(() => {
+            setStep('paid')
+            setReceiptData({
+                id: 'TX-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                date: new Date().toLocaleString(),
+                amount: '0.005 BTC',
+                method: 'Lightning Network',
+                status: 'Confirmed'
+            })
+            toast({
+                title: 'Payment Received!',
+                description: 'Your contribution has been recorded on-chain.',
+                status: 'success',
+                duration: 5000,
+                isClosable: true
+            })
+        }, 5000) // 5 seconds to pay
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const PaymentMethod = ({ id, icon, title, desc }: any) => (
-        <Card
-            variant="outline"
-            cursor="pointer"
-            borderColor={selectedMethod === id ? 'purple.500' : 'gray.200'}
-            bg={selectedMethod === id ? 'purple.50' : 'white'}
-            onClick={() => setSelectedMethod(id)}
-            _hover={{ borderColor: 'purple.400', transform: 'translateY(-2px)', shadow: 'md' }}
-            transition="all 0.2s"
-        >
-            <CardBody>
-                <Flex align="center" justify="space-between" mb={3}>
-                    <Icon as={icon} w={8} h={8} color={selectedMethod === id ? 'purple.500' : 'gray.400'} />
-                    {selectedMethod === id && <Icon as={FaCheckCircle} color="purple.500" />}
-                </Flex>
-                <Heading size="sm" mb={1} color="gray.700">{title}</Heading>
-                <Text fontSize="xs" color="gray.500">{desc}</Text>
-            </CardBody>
-        </Card>
-    )
+    if (!isConnected) {
+        return (
+            <Container maxW="container.md" py={20} textAlign="center">
+                <Icon as={FaBitcoin} w={16} h={16} color="purple.500" mb={6} />
+                <Heading mb={4}>Connect Wallet</Heading>
+                <Text mb={6} color="gray.600">You must connect your Lightning wallet (Leather, Xverse) to make a secure contribution.</Text>
+                <Button colorScheme="purple" size="lg" onClick={connectWallet}>Connect Wallet</Button>
+            </Container>
+        )
+    }
 
     return (
         <Box py={10}>
             <Container maxW="container.md">
-                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => navigate(-1)}>
-                    Back
+                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => navigate('/dashboard')}>
+                    Back to Dashboard
                 </Button>
 
-                <VStack spacing={8} align="stretch">
+                {step === 'idle' && (
                     <Box textAlign="center">
-                        <Heading size="lg" mb={2} color="brand.800">Make a Contribution</Heading>
-                        <Text color="gray.500">Secure your future. Verify on-chain.</Text>
-                    </Box>
-
-                    {/* Amount Input */}
-                    <Card variant="outline" borderColor="gray.200" shadow="sm">
-                        <CardBody>
-                            <Text mb={2} fontWeight="bold" color="gray.600">Amount to Contribute</Text>
-                            <InputGroup size="lg" mb={2}>
-                                <Input
-                                    type="number"
-                                    placeholder="0.00"
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
-                                    borderColor="gray.300"
-                                    _focus={{ borderColor: 'purple.500', boxShadow: 'none' }}
-                                />
-                                <InputRightAddon bg="gray.100" color="gray.600">BTC</InputRightAddon>
-                            </InputGroup>
-                            <Text fontSize="sm" color="gray.500" textAlign="right">
-                                ≈ KES {fiatAmount}
-                            </Text>
-
-                            <Divider my={4} />
-
-                            <Text mb={2} fontWeight="bold" color="gray.600">Message (Optional)</Text>
-                            <Textarea
-                                placeholder="E.g. Monthly contribution for June"
-                                value={message}
-                                onChange={(e) => setMessage(e.target.value)}
-                                borderColor="gray.300"
-                                _focus={{ borderColor: 'purple.500', boxShadow: 'none' }}
-                            />
-                        </CardBody>
-                    </Card>
-
-                    {/* Payment Methods */}
-                    <Box>
-                        <Text mb={4} fontWeight="bold" color="gray.600">Select Payment Method</Text>
-                        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                            <PaymentMethod id="lightning" icon={FaBitcoin} title="Lightning" desc="Instant & Low Fees" />
-                            <PaymentMethod id="mpesa" icon={FaMobileAlt} title="M-Pesa" desc="Auto-convert to BTC" />
-                            <PaymentMethod id="ussd" icon={FaMobileAlt} title="USSD" desc="*544# Offline" />
-                        </SimpleGrid>
-                    </Box>
-
-                    {/* QR Code / Action Area */}
-                    {selectedMethod === 'lightning' && (
-                        <Card variant="outline" bg="white" borderColor="purple.500" shadow="md">
-                            <CardBody>
-                                <VStack spacing={4}>
-                                    <Heading size="md" color="gray.700">Scan to Pay</Heading>
-                                    <Text color="gray.500" fontSize="sm">Use a Lightning wallet like Phoenix or Blink</Text>
-
-                                    <Box p={4} bg="white" border="1px solid" borderColor="gray.200" rounded="lg">
-                                        <QRCodeCanvas value={`lightning:testinvoice?amount=${amount}`} size={200} />
+                        <Heading mb={2}>Make Contribution</Heading>
+                        <Text color="gray.500" mb={8}>
+                            Monthly Cycle: January 2026
+                        </Text>
+                        <Card variant="outline" borderColor="purple.500" borderWidth={2} shadow="md">
+                            <CardBody py={10}>
+                                <VStack spacing={6}>
+                                    <Icon as={FaBolt} color="yellow.400" w={12} h={12} />
+                                    <Box>
+                                        <Heading size="lg">{formatCurrency('0.005').btc}</Heading>
+                                        <Text color="gray.500">≈ {formatCurrency('0.005').local}</Text>
                                     </Box>
-
-                                    <Box w="full" bg="gray.50" p={3} rounded="md" border="1px dashed" borderColor="gray.300">
-                                        <Flex justify="space-between" align="center">
-                                            <Code flex="1" bg="transparent" fontSize="xs" mr={2} isTruncated>
-                                                lnbc10n1p3j8y7spp...5d9...
-                                            </Code>
-                                            <IconButton
-                                                aria-label="Copy invoice"
-                                                icon={<FaCopy />}
-                                                size="sm"
-                                                onClick={copyInvoice}
-                                            />
-                                        </Flex>
-                                    </Box>
+                                    <Divider />
+                                    <VStack fontSize="sm" color="gray.600" spacing={1}>
+                                        <Text>Beneficiary: <b>Chama Vault (Multi-Sig)</b></Text>
+                                        <Text>Fee: <b>~ 5 sats</b> (Lightning)</Text>
+                                    </VStack>
+                                    <Button
+                                        w="full"
+                                        size="lg"
+                                        colorScheme="purple"
+                                        isLoading={loading}
+                                        loadingText="Generating Invoice..."
+                                        onClick={generateInvoice}
+                                        leftIcon={<FaBolt />}
+                                    >
+                                        Pay with Lightning
+                                    </Button>
                                 </VStack>
                             </CardBody>
                         </Card>
-                    )}
+                    </Box>
+                )}
 
-                    <Button size="lg" colorScheme="purple" onClick={handleContribute} isDisabled={!amount || !selectedMethod} shadow="lg">
-                        Confirm Contribution
-                    </Button>
+                {step === 'invoice' && invoice && (
+                    <Box textAlign="center">
+                        <Heading size="md" mb={6}>Scan to Pay</Heading>
+                        <Card variant="outline">
+                            <CardBody>
+                                <VStack spacing={6}>
+                                    <Box p={4} bg="white" rounded="xl" shadow="sm" border="1px solid" borderColor="gray.100">
+                                        <QRCodeSVG value={invoice} size={256} />
+                                    </Box>
+                                    <Box w="full">
+                                        <Text fontSize="xs" fontWeight="bold" mb={1} textAlign="left">Invoice String</Text>
+                                        <Flex bg="gray.50" p={2} rounded="md" justify="space-between" align="center">
+                                            <Text fontSize="xs" color="gray.500" isTruncated maxW="300px" fontFamily="mono">
+                                                {invoice}
+                                            </Text>
+                                            <Button size="xs" onClick={() => { navigator.clipboard.writeText(invoice); toast({ title: 'Copied', status: 'info' }) }}>
+                                                Copy
+                                            </Button>
+                                        </Flex>
+                                    </Box>
+                                    <Flex align="center" gap={2} color="purple.600">
+                                        <Spinner size="sm" />
+                                        <Text fontWeight="bold" fontSize="sm">Waiting for payment confirmation...</Text>
+                                    </Flex>
+                                </VStack>
+                            </CardBody>
+                        </Card>
+                    </Box>
+                )}
 
-                </VStack>
+                {step === 'paid' && receiptData && (
+                    <Box>
+                        <Alert status="success" mb={6} rounded="md">
+                            <AlertIcon />
+                            Payment Confirmed! Your balance has been updated.
+                        </Alert>
+
+                        <Card variant="outline" borderColor="green.400" borderWidth="1px" bg="white" position="relative" overflow="hidden">
+                            {/* Decorative Watermark */}
+                            <Icon as={FaCheckCircle} position="absolute" right="-20px" top="-20px" w="150px" h="150px" color="green.50" zIndex={0} />
+
+                            <CardBody position="relative" zIndex={1} p={8}>
+                                <VStack spacing={6}>
+                                    <Badge colorScheme="green" fontSize="md" px={3} py={1} rounded="full">Verified Receipt</Badge>
+
+                                    <VStack spacing={0}>
+                                        <Text fontSize="sm" color="gray.500">Amount Paid</Text>
+                                        <Heading size="xl" color="green.600">{formatCurrency('0.005').full}</Heading>
+                                    </VStack>
+
+                                    <Divider borderStyle="dashed" />
+
+                                    <VStack w="full" spacing={3}>
+                                        <Flex w="full" justify="space-between">
+                                            <Text color="gray.500">Transaction ID</Text>
+                                            <Text fontWeight="mono" fontSize="sm">{receiptData.id}</Text>
+                                        </Flex>
+                                        <Flex w="full" justify="space-between">
+                                            <Text color="gray.500">Date</Text>
+                                            <Text fontWeight="medium">{receiptData.date}</Text>
+                                        </Flex>
+                                        <Flex w="full" justify="space-between">
+                                            <Text color="gray.500">Payment Method</Text>
+                                            <Flex align="center" gap={1}>
+                                                <Icon as={FaBolt} color="yellow.500" />
+                                                <Text fontWeight="medium">{receiptData.method}</Text>
+                                            </Flex>
+                                        </Flex>
+                                        <Flex w="full" justify="space-between">
+                                            <Text color="gray.500">Status</Text>
+                                            <Flex align="center" gap={1} color="green.500">
+                                                <Icon as={FaCheckCircle} />
+                                                <Text fontWeight="bold">{receiptData.status}</Text>
+                                            </Flex>
+                                        </Flex>
+                                    </VStack>
+
+                                    <Divider />
+
+                                    <Flex w="full" gap={4}>
+                                        <Button flex="1" leftIcon={<FaDownload />} variant="outline">
+                                            Save Image
+                                        </Button>
+                                        <Button flex="1" leftIcon={<FaShareAlt />} colorScheme="purple">
+                                            Share Receipt
+                                        </Button>
+                                    </Flex>
+                                </VStack>
+                            </CardBody>
+                        </Card>
+
+                        <Button mt={6} w="full" variant="ghost" onClick={() => navigate('/dashboard')}>
+                            Return to Dashboard
+                        </Button>
+                    </Box>
+                )}
             </Container>
         </Box>
     )

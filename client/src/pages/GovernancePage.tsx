@@ -20,310 +20,235 @@ import {
     ModalFooter,
     ModalBody,
     ModalCloseButton,
-    useDisclosure,
     FormControl,
     FormLabel,
     Input,
     Select,
     Textarea,
-    Tabs,
-    TabList,
-    TabPanels,
-    Tab,
-    TabPanel,
-    SimpleGrid,
-    Divider,
-    Alert,
-    AlertIcon
+    useDisclosure
 } from '@chakra-ui/react'
-import { FaBullhorn, FaCheckCircle, FaTimesCircle, FaArrowLeft, FaEye, FaHistory, FaVoteYea } from 'react-icons/fa'
+import { FaVoteYea, FaBullhorn, FaCheckCircle, FaTimesCircle, FaPlus, FaArrowLeft } from 'react-icons/fa'
 import { useWallet } from '../context/WalletContext'
-import { useNavigate } from 'react-router-dom'
+
+interface Proposal {
+    id: number
+    title: string
+    type: string
+    description: string
+    amount?: string // For loans
+    votesFor: number
+    votesAgainst: number
+    totalMembers: number
+    status: 'Active' | 'Passed' | 'Rejected'
+    deadline: string
+    myVote?: 'YES' | 'NO'
+}
 
 const GovernancePage = () => {
     const { isConnected } = useWallet()
     const toast = useToast()
-    const navigate = useNavigate()
+    const { isOpen, onOpen, onClose } = useDisclosure()
 
-    // Create Proposal Modal
-    const { isOpen: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure()
-
-    // View/Vote Modal
-    const { isOpen: isVoteOpen, onOpen: onVoteOpen, onClose: onVoteClose } = useDisclosure()
-    const [selectedProposal, setSelectedProposal] = useState<any>(null)
-
-    // Form State
-    const [title, setTitle] = useState('')
-    const [type, setType] = useState('Loan')
-    const [desc, setDesc] = useState('')
-
-    // Mock Proposals Initial State
-    const [proposals, setProposals] = useState([
-        { id: 1, title: 'Approve Loan for Bob', type: 'Loan Request', amount: '0.1 BTC', votesFor: 6, votesAgainst: 1, totalMembers: 10, status: 'Active', deadline: '2 days', creator: 'Bob' },
-        { id: 2, title: 'Increase Payout Cycle', type: 'Timeline Change', desc: 'Change from 30 days to 45 days', votesFor: 2, votesAgainst: 4, totalMembers: 10, status: 'Active', deadline: '5 days', creator: 'Alice' },
-        { id: 3, title: 'Add New Member: Charlie', type: 'Add New Member', desc: '0.01 BTC Collateral Paid', votesFor: 9, votesAgainst: 0, totalMembers: 10, status: 'Passed', deadline: 'Ended', creator: 'Admin' },
+    // Mock Proposals
+    const [proposals, setProposals] = useState<Proposal[]>([
+        { id: 1, title: 'Approve Loan for Bob', type: 'Loan', amount: '0.1 BTC', description: 'Business expansion loan.', votesFor: 6, votesAgainst: 1, totalMembers: 10, status: 'Active', deadline: '2 days' },
+        { id: 2, title: 'Increase Payout Cycle', type: 'Rule Change', description: 'Change from 30 days to 45 days', votesFor: 2, votesAgainst: 4, totalMembers: 10, status: 'Active', deadline: '5 days' },
+        { id: 3, title: 'Add New Member: Charlie', type: 'Membership', description: '0.01 BTC Collateral Paid', votesFor: 9, votesAgainst: 0, totalMembers: 10, status: 'Passed', deadline: 'Ended' },
     ])
 
-    // Mock user votes: proposalId -> vote
-    const [myVotes, setMyVotes] = useState<Record<number, 'YES' | 'NO'>>({})
+    // Form State
+    const [newTitle, setNewTitle] = useState('')
+    const [newType, setNewType] = useState('Loan')
+    const [newDesc, setNewDesc] = useState('')
+    const [newAmount, setNewAmount] = useState('')
 
-    const handleViewProposal = (prop: any) => {
-        setSelectedProposal(prop)
-        onVoteOpen()
+    const handleCreateProposal = () => {
+        if (!newTitle || !newDesc) {
+            toast({ title: 'Please fill in all fields', status: 'warning' })
+            return
+        }
+
+        const newId = proposals.length + 1
+        const newProposal: Proposal = {
+            id: newId,
+            title: newTitle,
+            type: newType,
+            description: newDesc,
+            amount: newAmount,
+            votesFor: 0,
+            votesAgainst: 0,
+            totalMembers: 10, // Mock
+            status: 'Active',
+            deadline: '7 days'
+        }
+
+        setProposals([newProposal, ...proposals])
+        toast({ title: 'Proposal Created', status: 'success' })
+        onClose()
+        setNewTitle('')
+        setNewDesc('')
+        setNewAmount('')
     }
 
-    const handleVote = (vote: 'YES' | 'NO') => {
+    const handleVote = (id: number, vote: 'YES' | 'NO') => {
         if (!isConnected) {
-            toast({ title: 'Connect Wallet', status: 'warning' })
-            return
-        }
-        if (!selectedProposal) return
-
-        const previousVote = myVotes[selectedProposal.id]
-
-        if (previousVote === vote) {
-            toast({ title: `You already voted ${vote}`, status: 'info' })
+            toast({ title: 'Connect Wallet', description: 'You need to sign the vote transaction.', status: 'warning' })
             return
         }
 
-        // Apply vote logic
+        // Check if already voted (in a real app check backend)
+        const proposal = proposals.find(p => p.id === id)
+        if (proposal?.myVote) {
+            toast({ title: 'Vote already cast', status: 'error' })
+            return
+        }
+
+        // Optimistic update
         setProposals(prev => prev.map(p => {
-            if (p.id === selectedProposal.id) {
-                let newFor = p.votesFor
-                let newAgainst = p.votesAgainst
+            if (p.id === id) {
+                const updatedFor = vote === 'YES' ? p.votesFor + 1 : p.votesFor
+                const updatedAgainst = vote === 'NO' ? p.votesAgainst + 1 : p.votesAgainst
 
-                // Remove previous vote if any
-                if (previousVote === 'YES') newFor--
-                if (previousVote === 'NO') newAgainst--
+                // Check for auto-execution (51% threshold)
+                // Threshold = > 50% of totalMembers
+                const threshold = p.totalMembers / 2
+                let newStatus = p.status
 
-                // Add new vote
-                if (vote === 'YES') newFor++
-                if (vote === 'NO') newAgainst++
+                if (updatedFor > threshold) {
+                    newStatus = 'Passed'
+                    toast({
+                        title: 'Proposal Passed!',
+                        description: 'Threshold reached. Smart contract will execute automatically.',
+                        status: 'success',
+                        duration: 5000,
+                        isClosable: true
+                    })
+                }
 
-                return { ...p, votesFor: newFor, votesAgainst: newAgainst }
+                return {
+                    ...p,
+                    votesFor: updatedFor,
+                    votesAgainst: updatedAgainst,
+                    myVote: vote,
+                    status: newStatus
+                }
             }
             return p
         }))
 
-        setMyVotes(prev => ({ ...prev, [selectedProposal.id]: vote }))
-
         toast({
-            title: previousVote ? 'Vote Changed' : 'Vote Submitted',
-            description: `You voted ${vote} on Proposal #${selectedProposal.id}`,
+            title: 'Vote Submitted',
+            description: `You voted ${vote} on Proposal #${id}`,
             status: 'success',
             duration: 2000,
-            isClosable: true,
         })
-
-        onVoteClose()
     }
-
-    const handleSubmitProposal = () => {
-        if (!title || !desc) {
-            toast({ title: 'Please fill all fields', status: 'error' })
-            return
-        }
-
-        const newProposal = {
-            id: proposals.length + 1,
-            title,
-            type,
-            desc,
-            votesFor: 0,
-            votesAgainst: 0,
-            totalMembers: 10,
-            status: 'Active',
-            deadline: '7 days',
-            creator: 'You'
-        }
-
-        setProposals([newProposal, ...proposals])
-        onCreateClose()
-        setTitle('')
-        setDesc('')
-        toast({ title: 'Proposal Created', status: 'success' })
-    }
-
-    const activeProposals = proposals.filter(p => p.status === 'Active')
-    const pastProposals = proposals.filter(p => p.status !== 'Active')
-
-    const ProposalCard = ({ prop }: { prop: any }) => (
-        <Card variant="outline" borderColor={prop.status === 'Active' ? 'purple.400' : 'gray.200'} _hover={{ shadow: 'md' }}>
-            <CardBody>
-                <Flex justify="space-between" align="start" mb={3}>
-                    <Badge colorScheme={prop.type.includes('Loan') ? 'blue' : prop.type.includes('Member') ? 'green' : 'purple'}>
-                        {prop.type}
-                    </Badge>
-                    <Badge variant={prop.status === 'Active' ? 'solid' : 'subtle'} colorScheme={prop.status === 'Active' ? 'green' : 'gray'}>
-                        {prop.status}
-                    </Badge>
-                </Flex>
-
-                <Heading size="md" mb={2} color="gray.700">{prop.title}</Heading>
-                <Text fontSize="sm" color="gray.500" mb={4} noOfLines={2}>
-                    {prop.amount ? `Amount: ${prop.amount}` : prop.desc}
-                </Text>
-
-                <Box mb={4}>
-                    <Flex justify="space-between" fontSize="xs" mb={1}>
-                        <Text color="green.500">Yes: {prop.votesFor}</Text>
-                        <Text color="red.500">No: {prop.votesAgainst}</Text>
-                    </Flex>
-                    <Progress value={(prop.votesFor / prop.totalMembers) * 100} colorScheme="purple" size="xs" rounded="full" bg="gray.100" />
-                </Box>
-
-                <Button size="sm" w="full" variant="outline" rightIcon={<FaEye />} onClick={() => handleViewProposal(prop)}>
-                    View Details {prop.status === 'Active' && '& Vote'}
-                </Button>
-            </CardBody>
-        </Card>
-    )
 
     return (
         <Box py={10}>
             <Container maxW="container.xl">
-                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => navigate(-1)}>
-                    Back
+                <Button variant="ghost" leftIcon={<FaArrowLeft />} mb={6} onClick={() => window.history.back()}>
+                    Back to Chama
                 </Button>
-
-                <Flex justify="space-between" align="center" mb={8} direction={{ base: 'column', md: 'row' }} gap={4}>
+                <Flex justify="space-between" align="center" mb={10}>
                     <Box>
-                        <Heading size="lg" mb={2} color="brand.800">Governance</Heading>
-                        <Text color="gray.500">Vote on loans, rule changes, and new members.</Text>
+                        <Heading size="lg" mb={2}>Governance</Heading>
+                        <Text color="gray.500">Vote on loans, rule changes, and custom community actions.</Text>
                     </Box>
-                    <Button leftIcon={<FaBullhorn />} colorScheme="purple" onClick={onCreateOpen}>Create Proposal</Button>
+                    <Button leftIcon={<FaPlus />} colorScheme="purple" onClick={onOpen}>Create Proposal</Button>
                 </Flex>
 
-                <Tabs variant="enclosed" colorScheme="purple">
-                    <TabList mb={6}>
-                        <Tab fontWeight="bold"><Icon as={FaVoteYea} mr={2} /> Active Proposals ({activeProposals.length})</Tab>
-                        <Tab fontWeight="bold"><Icon as={FaHistory} mr={2} /> Past Proposals</Tab>
-                    </TabList>
+                <VStack spacing={6} align="stretch">
+                    {proposals.map((prop) => (
+                        <Card key={prop.id} variant={prop.status === 'Active' ? 'elevated' : 'outline'} opacity={prop.status !== 'Active' ? 0.7 : 1} borderLeft={prop.status === 'Passed' ? '4px solid green' : undefined}>
+                            <CardBody>
+                                <Flex direction={{ base: 'column', md: 'row' }} justify="space-between" gap={6}>
+                                    <Box flex="1">
+                                        <Flex align="center" gap={3} mb={2}>
+                                            <Badge colorScheme={prop.type === 'Loan' ? 'blue' : prop.type === 'Membership' ? 'green' : prop.type === 'Custom' ? 'orange' : 'purple'}>{prop.type}</Badge>
+                                            <Badge colorScheme={prop.status === 'Active' ? 'blue' : prop.status === 'Passed' ? 'green' : 'red'}>{prop.status}</Badge>
+                                            <Text fontSize="xs" color="gray.500">Expires in {prop.deadline}</Text>
+                                        </Flex>
+                                        <Heading size="md" mb={2}>{prop.title}</Heading>
+                                        <Text color="gray.600" mb={4}>
+                                            {prop.amount && <Text as="span" fontWeight="bold" mr={2}>Requesting: {prop.amount}</Text>}
+                                            {prop.description}
+                                        </Text>
 
-                    <TabPanels>
-                        <TabPanel p={0}>
-                            {activeProposals.length > 0 ? (
-                                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-                                    {activeProposals.map(p => <ProposalCard key={p.id} prop={p} />)}
-                                </SimpleGrid>
-                            ) : (
-                                <Alert status="info" rounded="md"><AlertIcon />No active proposals at the moment.</Alert>
-                            )}
-                        </TabPanel>
-                        <TabPanel p={0}>
-                            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-                                {pastProposals.map(p => <ProposalCard key={p.id} prop={p} />)}
-                            </SimpleGrid>
-                        </TabPanel>
-                    </TabPanels>
-                </Tabs>
+                                        {/* Progress Bar */}
+                                        <Box mt={4}>
+                                            <Flex justify="space-between" fontSize="xs" mb={1}>
+                                                <Text color="green.600" fontWeight="bold">Yes: {prop.votesFor}</Text>
+                                                <Text color="red.600" fontWeight="bold">No: {prop.votesAgainst}</Text>
+                                            </Flex>
+                                            <Progress value={(prop.votesFor / prop.totalMembers) * 100} colorScheme={prop.status === 'Passed' ? 'green' : 'purple'} size="sm" rounded="full" bg="gray.100" />
+                                            <Text fontSize="xs" color="gray.400" mt={1}>{prop.votesFor + prop.votesAgainst} / {prop.totalMembers} voted (Threshold: 51%)</Text>
+                                        </Box>
+                                    </Box>
+
+                                    {prop.status === 'Active' && !prop.myVote && (
+                                        <Flex direction={{ base: 'row', md: 'column' }} gap={3} justify="center" minW="150px">
+                                            <Button leftIcon={<FaCheckCircle />} colorScheme="green" variant="solid" onClick={() => handleVote(prop.id, 'YES')}>
+                                                Approve
+                                            </Button>
+                                            <Button leftIcon={<FaTimesCircle />} colorScheme="red" variant="outline" onClick={() => handleVote(prop.id, 'NO')}>
+                                                Reject
+                                            </Button>
+                                        </Flex>
+                                    )}
+
+                                    {prop.myVote && (
+                                        <Flex direction="column" justify="center" align="center" minW="150px">
+                                            <Text fontWeight="bold" color={prop.myVote === 'YES' ? 'green.500' : 'red.500'}>
+                                                You Voted {prop.myVote}
+                                            </Text>
+                                        </Flex>
+                                    )}
+                                </Flex>
+                            </CardBody>
+                        </Card>
+                    ))}
+                </VStack>
 
                 {/* Create Proposal Modal */}
-                <Modal isOpen={isCreateOpen} onClose={onCreateClose}>
-                    <ModalOverlay backdropFilter="blur(5px)" />
+                <Modal isOpen={isOpen} onClose={onClose}>
+                    <ModalOverlay />
                     <ModalContent>
                         <ModalHeader>Create New Proposal</ModalHeader>
                         <ModalCloseButton />
-                        <ModalBody>
+                        <ModalBody pb={6}>
                             <VStack spacing={4}>
                                 <FormControl>
                                     <FormLabel>Proposal Type</FormLabel>
-                                    <Select value={type} onChange={(e) => setType(e.target.value)}>
-                                        <option value="Loan Request">Loan Request</option>
+                                    <Select value={newType} onChange={(e) => setNewType(e.target.value)}>
+                                        <option value="Loan">Loan Request</option>
+                                        <option value="Membership">Membership Change</option>
                                         <option value="Rule Change">Rule Change</option>
-                                        <option value="Timeline Change">Timeline Change</option>
-                                        <option value="Contribution Amount Change">Contribution Amount Change</option>
-                                        <option value="Add New Member">Add New Member</option>
-                                        <option value="Remove Member">Remove Member</option>
-                                        <option value="Emergency Payout">Emergency Payout</option>
-                                        <option value="Other">Other</option>
+                                        <option value="Custom">Custom / Other</option>
                                     </Select>
                                 </FormControl>
-
-                                {type === 'Other' && (
-                                    <FormControl isRequired>
-                                        <FormLabel>Specify Proposal Type</FormLabel>
-                                        <Input placeholder="e.g. Marketing Budget" onChange={(e) => setType(`Other: ${e.target.value}`)} />
+                                <FormControl isRequired>
+                                    <FormLabel>Title</FormLabel>
+                                    <Input placeholder="Proposal Title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
+                                </FormControl>
+                                {newType === 'Loan' && (
+                                    <FormControl>
+                                        <FormLabel>Amount (BTC)</FormLabel>
+                                        <Input placeholder="0.00" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} />
                                     </FormControl>
                                 )}
-
-                                <FormControl>
-                                    <FormLabel>Title</FormLabel>
-                                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Requesting 0.5 BTC Loan" />
-                                </FormControl>
-                                <FormControl>
-                                    <FormLabel>Description / Amount</FormLabel>
-                                    <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Explain why or state amount..." />
+                                <FormControl isRequired>
+                                    <FormLabel>{newType === 'Custom' ? 'Details / Question' : 'Description / Reason'}</FormLabel>
+                                    <Textarea placeholder="Describe your proposal..." value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
                                 </FormControl>
                             </VStack>
                         </ModalBody>
+
                         <ModalFooter>
-                            <Button variant="ghost" mr={3} onClick={onCreateClose}>Cancel</Button>
-                            <Button colorScheme="purple" onClick={handleSubmitProposal}>Submit Proposal</Button>
-                        </ModalFooter>
-                    </ModalContent>
-                </Modal>
-
-                {/* View/Vote Modal */}
-                <Modal isOpen={isVoteOpen} onClose={onVoteClose} size="lg">
-                    <ModalOverlay backdropFilter="blur(5px)" />
-                    <ModalContent>
-                        <ModalHeader>
-                            {selectedProposal?.title}
-                            <Badge ml={3} colorScheme={selectedProposal?.status === 'Active' ? 'green' : 'gray'}>{selectedProposal?.status}</Badge>
-                        </ModalHeader>
-                        <ModalCloseButton />
-                        <ModalBody>
-                            <VStack align="stretch" spacing={4}>
-                                <Box>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.500">PROPOSAL TYPE</Text>
-                                    <Text>{selectedProposal?.type}</Text>
-                                </Box>
-                                <Box>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.500">DESCRIPTION</Text>
-                                    <Text>{selectedProposal?.desc || `Amount: ${selectedProposal?.amount}`}</Text>
-                                </Box>
-                                <Box>
-                                    <Text fontWeight="bold" fontSize="sm" color="gray.500">CREATOR</Text>
-                                    <Text>{selectedProposal?.creator}</Text>
-                                </Box>
-
-                                <Divider />
-
-                                <Box>
-                                    <Flex justify="space-between" mb={2}>
-                                        <Text fontWeight="bold">Current Votes</Text>
-                                        <Text fontSize="sm" color="gray.500">{selectedProposal?.votesFor + selectedProposal?.votesAgainst} / {selectedProposal?.totalMembers} Votes</Text>
-                                    </Flex>
-                                    <Progress value={(selectedProposal?.votesFor / selectedProposal?.totalMembers) * 100} colorScheme="purple" size="md" rounded="full" />
-                                    <Flex justify="space-between" mt={1}>
-                                        <Text fontSize="sm" color="green.600">{selectedProposal?.votesFor} Yes</Text>
-                                        <Text fontSize="sm" color="red.600">{selectedProposal?.votesAgainst} No</Text>
-                                    </Flex>
-                                </Box>
-
-                                {myVotes[selectedProposal?.id] && (
-                                    <Alert status="info" size="sm" variant="left-accent">
-                                        <AlertIcon />
-                                        You have voted: <b>{myVotes[selectedProposal?.id]}</b>
-                                    </Alert>
-                                )}
-                            </VStack>
-                        </ModalBody>
-
-                        <ModalFooter justifyContent="space-between">
-                            {selectedProposal?.status === 'Active' ? (
-                                <>
-                                    <Button flex="1" mr={2} leftIcon={<FaCheckCircle />} colorScheme="green" variant="solid" onClick={() => handleVote('YES')}>
-                                        Vote Accept
-                                    </Button>
-                                    <Button flex="1" ml={2} leftIcon={<FaTimesCircle />} colorScheme="red" variant="outline" onClick={() => handleVote('NO')}>
-                                        Vote Reject
-                                    </Button>
-                                </>
-                            ) : (
-                                <Text color="gray.500" fontSize="sm" w="full" textAlign="center">Voting has ended.</Text>
-                            )}
+                            <Button colorScheme="purple" mr={3} onClick={handleCreateProposal}>
+                                Submit Proposal
+                            </Button>
+                            <Button onClick={onClose}>Cancel</Button>
                         </ModalFooter>
                     </ModalContent>
                 </Modal>
