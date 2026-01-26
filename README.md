@@ -20,7 +20,7 @@ We handle the messy stuff-ledger tracking, contribution windows, voting on loans
 
 ### The Chama Wizard
 A 6-step wizard that holds your hand while you set up your empire... err, savings group.
-1.  **Basic Info:** Name your group something professional, or not. We don't judge.
+1.  **Basic Info:** Name your group something professional, or not. We don't judge.(We actually do)
 2.  **Members:** Invite the crew.
 3.  **Financial Rules:** Decide how much everyone pays and when.
 4.  **Loan Settings:** Want to lend money? Set the interest rates here.
