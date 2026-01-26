@@ -1,6 +1,6 @@
 # ImpactChain: Because Trusting Your Cousin with the Money is So 2010.
 
-Welcome to **ImpactChain**, the decentralized platform that takes the "drama" out of your "Chama". We are revolutionizing traditional savings circles (Chamas) by putting them on the blockchain. Why? Because math doesn't lie, but Chad from accounting might.
+Welcome to **ImpactChain**, the decentralized platform that takes the "drama" out of your "Chama", Okay, that was lame ASF. We are revolutionizing traditional savings circles (Chamas) by putting them on the blockchain. Why? Because math doesn't lie, but Chad from accounting might.
 
 ## What is this thing?
 
