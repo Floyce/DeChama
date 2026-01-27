@@ -31,3 +31,12 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Python Backend
+backend/.env
+backend/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+backend/app/certs/*.macaroon
+backend/app/certs/*.cert

@@ -137,7 +137,6 @@ const LandingPage = () => {
                             >
                                 <VStack align="start" spacing={0} px={2}>
                                     <Text fontSize="md">Create New Account</Text>
-                                    <Text fontSize="xs" fontWeight="normal" opacity={0.8}>Start your own savings circle</Text>
                                 </VStack>
                             </Button>
                             <Button

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: impact_chain_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-impact_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-impact_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-impact_chain}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: impact_chain_api
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
