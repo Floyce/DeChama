@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
     Box,
     Container,
@@ -25,123 +25,154 @@ import {
     Input,
     Select,
     Textarea,
-    useDisclosure
+    useDisclosure,
+    HStack
 } from '@chakra-ui/react'
-import { FaVoteYea, FaBullhorn, FaCheckCircle, FaTimesCircle, FaPlus, FaArrowLeft } from 'react-icons/fa'
+import { FaVoteYea, FaBullhorn, FaCheckCircle, FaTimesCircle, FaPlus, FaArrowLeft, FaUsers } from 'react-icons/fa'
 import { useWallet } from '../context/WalletContext'
+import { useAuth } from '../context/AuthContext'
 
 interface Proposal {
-    id: number
+    id: string
     title: string
     type: string
     description: string
-    amount?: string // For loans
-    votesFor: number
-    votesAgainst: number
-    totalMembers: number
-    status: 'Active' | 'Passed' | 'Rejected'
+    votes_for: number
+    votes_against: number
+    status: 'active' | 'passed' | 'rejected' | 'executed'
     deadline: string
-    myVote?: 'YES' | 'NO'
+    myVote?: boolean
 }
 
 const GovernancePage = () => {
-    const { isConnected } = useWallet()
+    const { isConnected, activeChama, currentUserRole } = useWallet()
+    const { user } = useAuth()
     const toast = useToast()
     const { isOpen, onOpen, onClose } = useDisclosure()
 
-    // Mock Proposals
-    const [proposals, setProposals] = useState<Proposal[]>([
-        { id: 1, title: 'Approve Loan for Bob', type: 'Loan', amount: '0.1 BTC', description: 'Business expansion loan.', votesFor: 6, votesAgainst: 1, totalMembers: 10, status: 'Active', deadline: '2 days' },
-        { id: 2, title: 'Increase Payout Cycle', type: 'Rule Change', description: 'Change from 30 days to 45 days', votesFor: 2, votesAgainst: 4, totalMembers: 10, status: 'Active', deadline: '5 days' },
-        { id: 3, title: 'Add New Member: Charlie', type: 'Membership', description: '0.01 BTC Collateral Paid', votesFor: 9, votesAgainst: 0, totalMembers: 10, status: 'Passed', deadline: 'Ended' },
-    ])
+    const [pendingMembers, setPendingMembers] = useState<any[]>([])
+    const [isApproving, setIsApproving] = useState<string | null>(null)
+    const [proposals, setProposals] = useState<Proposal[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [totalMembers, setTotalMembers] = useState(10) // Should ideally come from chama details
+
+    // Fetch Proposals & Pending members
+    const fetchData = async () => {
+        if (!activeChama) return
+        setIsLoading(true)
+        try {
+            // Proposals
+            const pRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}/proposals`)
+            const pData = await pRes.json()
+            if (Array.isArray(pData)) setProposals(pData)
+
+            // Pending Members (if admin)
+            if (currentUserRole === 'admin') {
+                const mRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}/pending-members`)
+                const mData = await mRes.json()
+                if (Array.isArray(mData)) setPendingMembers(mData)
+            }
+
+            // Get Chama Details for total members count
+            const cRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}`)
+            const cData = await cRes.json()
+            if (cData.expected_members) setTotalMembers(cData.expected_members)
+
+        } catch (err) {
+            console.error("Failed to fetch governance data", err)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        fetchData()
+    }, [activeChama, currentUserRole])
+
+    const handleApprove = async (userId: string) => {
+        setIsApproving(userId)
+        try {
+            const res = await fetch(`/api/chamas/${encodeURIComponent(activeChama!)}/approve-member`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: userId })
+            })
+            const data = await res.json()
+            if (data.success) {
+                toast({ title: 'Member Approved', status: 'success' })
+                setPendingMembers(prev => prev.filter(u => u.id !== userId))
+            }
+        } catch (err) {
+            toast({ title: 'Approval Failed', status: 'error' })
+        } finally {
+            setIsApproving(null)
+        }
+    }
 
     // Form State
     const [newTitle, setNewTitle] = useState('')
-    const [newType, setNewType] = useState('Loan')
+    const [newType, setNewType] = useState('loan_request')
     const [newDesc, setNewDesc] = useState('')
     const [newAmount, setNewAmount] = useState('')
 
-    const handleCreateProposal = () => {
-        if (!newTitle || !newDesc) {
-            toast({ title: 'Please fill in all fields', status: 'warning' })
+    const handleCreateProposal = async () => {
+        if (!newTitle || !newDesc || !user || !activeChama) {
+            toast({ title: 'Missing information', status: 'warning' })
             return
         }
 
-        const newId = proposals.length + 1
-        const newProposal: Proposal = {
-            id: newId,
-            title: newTitle,
-            type: newType,
-            description: newDesc,
-            amount: newAmount,
-            votesFor: 0,
-            votesAgainst: 0,
-            totalMembers: 10, // Mock
-            status: 'Active',
-            deadline: '7 days'
+        try {
+            const res = await fetch('/api/governance/proposals/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chama_id: activeChama,
+                    creator_id: user.id,
+                    type: newType,
+                    title: newTitle,
+                    description: newDesc,
+                    payload: newType === 'loan_request' ? { amount: newAmount } : {}
+                })
+            })
+            if (res.ok) {
+                toast({ title: 'Proposal Created', status: 'success' })
+                onClose()
+                fetchData() // Refresh
+                setNewTitle('')
+                setNewDesc('')
+                setNewAmount('')
+            }
+        } catch (err) {
+            toast({ title: 'Failed to create proposal', status: 'error' })
         }
-
-        setProposals([newProposal, ...proposals])
-        toast({ title: 'Proposal Created', status: 'success' })
-        onClose()
-        setNewTitle('')
-        setNewDesc('')
-        setNewAmount('')
     }
 
-    const handleVote = (id: number, vote: 'YES' | 'NO') => {
-        if (!isConnected) {
-            toast({ title: 'Connect Wallet', description: 'You need to sign the vote transaction.', status: 'warning' })
+    const handleVote = async (id: string, voteValue: boolean) => {
+        if (!isConnected || !user) {
+            toast({ title: 'Connect Wallet', status: 'warning' })
             return
         }
 
-        // Check if already voted (in a real app check backend)
-        const proposal = proposals.find(p => p.id === id)
-        if (proposal?.myVote) {
-            toast({ title: 'Vote already cast', status: 'error' })
-            return
-        }
-
-        // Optimistic update
-        setProposals(prev => prev.map(p => {
-            if (p.id === id) {
-                const updatedFor = vote === 'YES' ? p.votesFor + 1 : p.votesFor
-                const updatedAgainst = vote === 'NO' ? p.votesAgainst + 1 : p.votesAgainst
-
-                // Check for auto-execution (51% threshold)
-                // Threshold = > 50% of totalMembers
-                const threshold = p.totalMembers / 2
-                let newStatus = p.status
-
-                if (updatedFor > threshold) {
-                    newStatus = 'Passed'
-                    toast({
-                        title: 'Proposal Passed!',
-                        description: 'Threshold reached. Smart contract will execute automatically.',
-                        status: 'success',
-                        duration: 5000,
-                        isClosable: true
-                    })
-                }
-
-                return {
-                    ...p,
-                    votesFor: updatedFor,
-                    votesAgainst: updatedAgainst,
-                    myVote: vote,
-                    status: newStatus
-                }
+        try {
+            const res = await fetch('/api/governance/vote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    proposal_id: id,
+                    voter_id: user.id,
+                    vote: voteValue
+                })
+            })
+            const data = await res.json()
+            if (data.success) {
+                toast({ title: 'Vote Submitted', status: 'success' })
+                fetchData() // Refresh to see updated counts and status
+            } else {
+                toast({ title: 'Voting failed', description: data.detail, status: 'error' })
             }
-            return p
-        }))
-
-        toast({
-            title: 'Vote Submitted',
-            description: `You voted ${vote} on Proposal #${id}`,
-            status: 'success',
-            duration: 2000,
-        })
+        } catch (err) {
+            toast({ title: 'Network Error', status: 'error' })
+        }
     }
 
     return (
@@ -158,7 +189,43 @@ const GovernancePage = () => {
                     <Button leftIcon={<FaPlus />} colorScheme="purple" onClick={onOpen}>Create Proposal</Button>
                 </Flex>
 
+                {pendingMembers.length > 0 && (
+                    <Box mb={10}>
+                        <Heading size="md" mb={4} color="purple.600">Pending Membership Requests</Heading>
+                        <VStack spacing={4} align="stretch">
+                            {pendingMembers.map((u) => (
+                                <Card key={u.id} variant="outline" borderColor="purple.200" bg="purple.50">
+                                    <CardBody>
+                                        <Flex justify="space-between" align="center">
+                                            <HStack spacing={4}>
+                                                <Icon as={FaUsers} color="purple.500" />
+                                                <Box>
+                                                    <Text fontWeight="bold">{u.display_name}</Text>
+                                                    <Text fontSize="xs" color="gray.500">{u.phoneNumber}</Text>
+                                                </Box>
+                                            </HStack>
+                                            <VStack align="end" spacing={1}>
+                                                <Button
+                                                    colorScheme="purple"
+                                                    size="sm"
+                                                    onClick={() => handleApprove(u.id)}
+                                                    isLoading={isApproving === u.id}
+                                                >
+                                                    Approve Entry
+                                                </Button>
+                                                <Text fontSize="10px" color="gray.500" fontWeight="bold">51% RULE APPLIES</Text>
+                                            </VStack>
+
+                                        </Flex>
+                                    </CardBody>
+                                </Card>
+                            ))}
+                        </VStack>
+                    </Box>
+                )}
+
                 <VStack spacing={6} align="stretch">
+
                     {proposals.map((prop) => (
                         <Card key={prop.id} variant={prop.status === 'Active' ? 'elevated' : 'outline'} opacity={prop.status !== 'Active' ? 0.7 : 1} borderLeft={prop.status === 'Passed' ? '4px solid green' : undefined}>
                             <CardBody>
@@ -187,15 +254,26 @@ const GovernancePage = () => {
                                     </Box>
 
                                     {prop.status === 'Active' && !prop.myVote && (
-                                        <Flex direction={{ base: 'row', md: 'column' }} gap={3} justify="center" minW="150px">
-                                            <Button leftIcon={<FaCheckCircle />} colorScheme="green" variant="solid" onClick={() => handleVote(prop.id, 'YES')}>
-                                                Approve
-                                            </Button>
-                                            <Button leftIcon={<FaTimesCircle />} colorScheme="red" variant="outline" onClick={() => handleVote(prop.id, 'NO')}>
-                                                Reject
-                                            </Button>
+                                        <Flex direction={{ base: 'column' }} gap={3} minW="200px">
+                                            <VStack align="stretch" spacing={2}>
+                                                <Button leftIcon={<FaCheckCircle />} colorScheme="green" variant="solid" onClick={() => handleVote(prop.id, 'YES')}>
+                                                    Approve
+                                                </Button>
+                                                <Button leftIcon={<FaTimesCircle />} colorScheme="red" variant="outline" onClick={() => handleVote(prop.id, 'NO')}>
+                                                    Reject
+                                                </Button>
+                                            </VStack>
+                                            <Box p={2} bg="gray.50" rounded="md" border="1px solid" borderColor="gray.100">
+                                                <Text fontSize="xs" fontWeight="bold" color="purple.600">
+                                                    Rule: 51% Consensus
+                                                </Text>
+                                                <Text fontSize="xs" color="gray.500">
+                                                    {Math.ceil(prop.totalMembers * 0.51)} of {prop.totalMembers} votes needed to pass.
+                                                </Text>
+                                            </Box>
                                         </Flex>
                                     )}
+
 
                                     {prop.myVote && (
                                         <Flex direction="column" justify="center" align="center" minW="150px">

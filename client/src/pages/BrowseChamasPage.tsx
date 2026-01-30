@@ -22,43 +22,62 @@ import {
 import { FaUsers, FaArrowLeft, FaFilter, FaSearch, FaLeaf, FaBuilding, FaHome, FaHandHoldingUsd, FaCheckCircle, FaClock, FaPlus } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
+import { useAuth } from '../context/AuthContext'
 
 const BrowseChamasPage = () => {
     const navigate = useNavigate()
-    const { setMyChamas, myChamas, isConnected, pendingChamas, setPendingChamas } = useWallet()
+    const { setMyChamas, myChamas, isConnected, pendingChamas, setPendingChamas, formatCurrency } = useWallet()
+    const { user } = useAuth()
+
     const toast = useToast()
 
-    // Protect Route
+    const [chamas, setChamas] = useState<any[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+
     useEffect(() => {
-        if (!isConnected) {
-            navigate('/auth')
+        const fetchDiscover = async () => {
+            try {
+                const res = await fetch('/api/chamas/discover')
+                const data = await res.json()
+                if (Array.isArray(data)) {
+                    setChamas(data)
+                }
+            } catch (err) {
+                console.error("Failed to fetch discovery", err)
+            } finally {
+                setIsLoading(false)
+            }
         }
-    }, [isConnected, navigate])
+        fetchDiscover()
+    }, [])
 
-    // Mock Public Chamas
-    const [chamas] = useState([
-        { name: 'Chama Alpha', members: 12, amount: '0.01 BTC', freq: 'Monthly', type: 'Investment' },
-        { name: 'Business Builders', members: 5, amount: '0.05 BTC', freq: 'Weekly', type: 'Business' },
-        { name: 'Family Fund', members: 8, amount: '0.005 BTC', freq: 'Monthly', type: 'Family' },
-        { name: 'Tech Startups', members: 20, amount: '0.1 BTC', freq: 'Monthly', type: 'Investment' },
-        { name: 'Local Savings', members: 15, amount: '0.002 BTC', freq: 'Bi-Weekly', type: 'Community' },
-        { name: 'Holiday Pot', members: 6, amount: '0.02 BTC', freq: 'Monthly', type: 'Family' },
-    ])
+    const handleJoin = async (chamaId: string, chamaName: string) => {
+        if (!user) return
 
-    const handleJoin = (chamaName: string) => {
-        // Add to pending chamas list
-        setPendingChamas(prev => [...prev, chamaName])
+        try {
+            const res = await fetch(`/api/chamas/${chamaId}/join-request`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id })
+            })
+            const data = await res.json()
 
-        toast({
-            title: 'Request Sent',
-            description: `Your request to join ${chamaName} has been sent to the members for approval.`,
-            status: 'info',
-            duration: 4000,
-            isClosable: true,
-        })
-
-        // Do NOT navigate. Stay on browse page.
+            if (data.success) {
+                setPendingChamas(prev => [...prev, chamaName])
+                toast({
+                    title: 'Request Sent',
+                    description: `Your request to join ${chamaName} has been sent for approval.`,
+                    status: 'info',
+                    duration: 4000,
+                })
+            } else {
+                toast({ title: 'Request Failed', description: data.detail, status: 'error' })
+            }
+        } catch (err) {
+            toast({ title: 'Network Error', status: 'error' })
+        }
     }
+
 
     // Checking status
     const getStatus = (chamaName: string) => {
@@ -102,52 +121,64 @@ const BrowseChamasPage = () => {
                 </Card>
 
                 {/* Grid */}
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
-                    {chamas.map((chama, i) => {
-                        const status = getStatus(chama.name)
-                        return (
-                            <Card key={i} _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }} transition="all 0.2s">
-                                <CardBody>
-                                    <HStack justify="space-between" mb={4}>
-                                        <Badge colorScheme="purple" fontSize="0.8em" px={2} py={1} rounded="md">{chama.type}</Badge>
-                                        <Text fontSize="sm" color="gray.500">{chama.freq}</Text>
-                                    </HStack>
-
-                                    <Heading size="md" mb={2}>{chama.name}</Heading>
-
-                                    <VStack align="start" spacing={1} mb={6}>
-                                        <HStack color="gray.600">
-                                            <Icon as={FaUsers} />
-                                            <Text>{chama.members} Members</Text>
+                {isLoading ? (
+                    <Text>Finding communities...</Text>
+                ) : (
+                    <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+                        {chamas.map((chama, i) => {
+                            const status = getStatus(chama.name)
+                            const btcAmount = (chama.contribution_amount_sats / 100_000_000).toFixed(3)
+                            return (
+                                <Card key={i} _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }} transition="all 0.2s">
+                                    <CardBody>
+                                        <HStack justify="space-between" mb={4}>
+                                            <Badge colorScheme="purple" fontSize="0.8em" px={2} py={1} rounded="md">{chama.type}</Badge>
+                                            <Text fontSize="sm" color="gray.500">{chama.frequency}</Text>
                                         </HStack>
-                                        <HStack color="gray.600">
-                                            <Icon as={FaHandHoldingUsd} />
-                                            <Text>{chama.amount} / period</Text>
-                                        </HStack>
-                                    </VStack>
 
-                                    <Button
-                                        w="full"
-                                        size="lg"
-                                        rounded="full"
-                                        colorScheme={status === 'member' ? 'green' : (status === 'pending' ? 'yellow' : 'purple')}
-                                        variant={status === 'member' ? 'outline' : 'solid'}
-                                        onClick={() => status === 'none' && handleJoin(chama.name)}
-                                        isDisabled={status !== 'none'}
-                                        leftIcon={status === 'member' ? <FaCheckCircle /> : (status === 'pending' ? <FaClock /> : <FaPlus />)}
-                                        _hover={status === 'none' ? {
-                                            transform: 'translateY(-2px)',
-                                            shadow: 'md'
-                                        } : {}}
-                                        transition="all 0.2s"
-                                    >
-                                        {status === 'member' ? 'Joined' : (status === 'pending' ? 'Pending Approval' : 'Request to Join')}
-                                    </Button>
-                                </CardBody>
-                            </Card>
-                        )
-                    })}
-                </SimpleGrid>
+                                        <Heading size="md" mb={2}>{chama.name}</Heading>
+
+                                        <VStack align="start" spacing={1} mb={6}>
+                                            <HStack color="gray.600">
+                                                <Icon as={FaUsers} />
+                                                <Text>Group of {chama.expected_members}</Text>
+                                            </HStack>
+                                            <HStack color="gray.600">
+                                                <Icon as={FaHandHoldingUsd} />
+                                                <Text>
+                                                    {formatCurrency(btcAmount).btc} / {chama.frequency}
+                                                    <Text as="span" fontSize="xs" ml={2} color="gray.400">
+                                                        (≈ {formatCurrency(btcAmount).local})
+                                                    </Text>
+                                                </Text>
+                                            </HStack>
+
+                                        </VStack>
+
+                                        <Button
+                                            w="full"
+                                            size="lg"
+                                            rounded="full"
+                                            colorScheme={status === 'member' ? 'green' : (status === 'pending' ? 'yellow' : 'purple')}
+                                            variant={status === 'member' ? 'outline' : 'solid'}
+                                            onClick={() => status === 'none' && handleJoin(chama.id, chama.name)}
+                                            isDisabled={status !== 'none'}
+                                            leftIcon={status === 'member' ? <FaCheckCircle /> : (status === 'pending' ? <FaClock /> : <FaPlus />)}
+                                            _hover={status === 'none' ? {
+                                                transform: 'translateY(-2px)',
+                                                shadow: 'md'
+                                            } : {}}
+                                            transition="all 0.2s"
+                                        >
+                                            {status === 'member' ? 'Joined' : (status === 'pending' ? 'Pending Approval' : 'Request to Join')}
+                                        </Button>
+                                    </CardBody>
+                                </Card>
+                            )
+                        })}
+                    </SimpleGrid>
+                )}
+
             </Container>
         </Box>
     )

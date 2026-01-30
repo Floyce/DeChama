@@ -18,7 +18,11 @@ interface WalletContextType {
     setPendingChamas: React.Dispatch<React.SetStateAction<string[]>>
     currency: string
     setCurrency: (c: string) => void
-    formatCurrency: (btc: string) => { btc: string; local: string; full: string }
+    formatCurrency: (btc: string) => { btc: string; local: string; full: string; sats: string }
+    currentUserRole: string | null
+    fetchMembership: (chamaId: string) => Promise<void>
+    preferredDisplay: 'BTC' | 'KES'
+    setPreferredDisplay: (d: 'BTC' | 'KES') => void
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
@@ -30,9 +34,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     const [myChamas, setMyChamas] = useState<string[]>([])
     const [activeChama, setActiveChama] = useState<string | null>(null)
     const [pendingChamas, setPendingChamas] = useState<string[]>([])
+    const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
 
     // Currency State
     const [currency, setCurrency] = useState('KES')
+    const [preferredDisplay, setPreferredDisplayState] = useState<'BTC' | 'KES'>('KES')
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({
         'KES': 12850000, // 1 BTC = ~12.8M KES
         'USD': 95000,    // 1 BTC = ~95k USD
@@ -42,21 +48,25 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
     const toast = useToast()
 
-    // Fetch Rates Logic (Mocked Real-Time)
+    // Fetch Rates Logic (Real-Time from Backend)
     useEffect(() => {
         // Initial load from preference
         const savedCurrency = localStorage.getItem('impactchain_currency')
         if (savedCurrency) setCurrency(savedCurrency)
 
-        const fetchRates = () => {
-            // Mock fluctuation
-            const randomFactor = 0.99 + Math.random() * 0.02 // +/- 1%
-            setExchangeRates(prev => ({
-                'KES': Math.floor(12850000 * randomFactor),
-                'USD': Math.floor(95000 * randomFactor),
-                'UGX': Math.floor(360000000 * randomFactor),
-                'TZS': Math.floor(250000000 * randomFactor)
-            }))
+        const fetchRates = async () => {
+            try {
+                const res = await fetch('/api/rates/btc-kes')
+                const data = await res.json()
+                if (data.rate) {
+                    setExchangeRates(prev => ({
+                        ...prev,
+                        'KES': data.rate
+                    }))
+                }
+            } catch (err) {
+                console.error("Failed to fetch rates", err)
+            }
         }
 
         fetchRates() // Initial fetch
@@ -65,12 +75,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }, [])
 
     const formatCurrency = (btcString: string) => {
-        // btcString expected like "0.045 BTC" or just "0.045"
         const amount = parseFloat(btcString.replace(/[^0-9.]/g, '')) || 0
         const rate = exchangeRates[currency] || 0
         const localValue = amount * rate
+        const satsValue = Math.round(amount * 100000000)
 
-        // Format
         const localFormatted = new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: currency,
@@ -78,10 +87,16 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         }).format(localValue)
 
         return {
-            btc: `${amount} BTC`,
+            btc: `${amount.toFixed(4)} BTC`,
+            sats: `${satsValue.toLocaleString()} sats`,
             local: localFormatted,
-            full: `${amount} BTC (≈ ${localFormatted})`
+            full: `${amount.toFixed(4)} BTC (≈ ${localFormatted})`
         }
+    }
+
+    const setPreferredDisplay = (d: 'BTC' | 'KES') => {
+        setPreferredDisplayState(d)
+        localStorage.setItem('impactchain_pref_display', d)
     }
 
     // Save currency preference
@@ -111,6 +126,26 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
+    const fetchMembership = async (chamaId: string) => {
+        const savedUser = localStorage.getItem('impactchain_user')
+        if (savedUser) {
+            const user = JSON.parse(savedUser)
+            try {
+                const res = await fetch(`/api/chamas/${chamaId}/my-membership?user_id=${user.id}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setCurrentUserRole(data.role)
+                } else {
+                    setCurrentUserRole(null)
+                }
+            } catch (err) {
+                console.error("Failed to fetch membership", err)
+                setCurrentUserRole(null)
+            }
+        }
+    }
+
+
     useEffect(() => {
         // Check local storage on load
         const savedAddress = localStorage.getItem('impactchain_address')
@@ -119,11 +154,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         if (savedAddress) {
             setAddress(savedAddress)
             setBalance('1.45')
-            // Don't set static mock chamas anymore
         }
         if (savedName) {
             setDisplayNameState(savedName)
         }
+        const savedDisplay = localStorage.getItem('impactchain_pref_display') as 'BTC' | 'KES'
+        if (savedDisplay) setPreferredDisplayState(savedDisplay)
 
         // Fetch real chamas
         fetchMyChamas()
@@ -194,7 +230,11 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
             setPendingChamas,
             currency,
             setCurrency: handleSetCurrency,
-            formatCurrency
+            formatCurrency,
+            currentUserRole,
+            fetchMembership,
+            preferredDisplay,
+            setPreferredDisplay
         }}>
             {children}
         </WalletContext.Provider>

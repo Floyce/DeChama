@@ -49,10 +49,14 @@ import { FaWallet, FaHandHoldingUsd, FaFileContract, FaPlus, FaUsers, FaCrown, F
 import { useWallet } from '../context/WalletContext'
 import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import PayoutCountdown from '../components/PayoutCountdown'
+import PayoutQueue from '../components/PayoutQueue'
+import PaydayCelebration from '../components/PaydayCelebration'
 
 const ChamaDetails = () => {
     const { chamaName } = useParams() // Get ID/Name from URL
     const { isConnected, myChamas, setActiveChama, activeChama, formatCurrency } = useWallet()
+    const { user } = useAuth()
     const navigate = useNavigate()
     const toast = useToast()
 
@@ -65,6 +69,26 @@ const ChamaDetails = () => {
     const [isJoining, setIsJoining] = useState(false)
     const [payoutYear, setPayoutYear] = useState('2025')
     const [payoutMonth, setPayoutMonth] = useState('January')
+    const [showPaydayCelebration, setShowPaydayCelebration] = useState(false)
+
+    // Mock payout data - In production, fetch from API
+    const nextPayoutDate = new Date(2026, 2, 15, 14, 0) // March 15, 2026 at 2 PM
+    const isPayday = new Date().toDateString() === nextPayoutDate.toDateString()
+
+    const payoutQueueMembers = [
+        { name: 'James', date: 'Jan 15', status: 'completed' as const },
+        { name: 'Mary', date: 'Feb 15', status: 'completed' as const },
+        { name: user?.displayName || 'You', date: 'Mar 15', status: 'current' as const, isCurrentUser: true },
+        { name: 'John', date: 'Apr 15', status: 'upcoming' as const },
+        { name: 'Sarah', date: 'May 15', status: 'upcoming' as const },
+    ]
+
+    // Check if it's payday on mount
+    useEffect(() => {
+        if (isPayday) {
+            setShowPaydayCelebration(true)
+        }
+    }, [isPayday])
 
     // Sync URL param with Context
     useEffect(() => {
@@ -207,7 +231,7 @@ const ChamaDetails = () => {
                 )}
 
                 {/* Header */}
-                <Flex justify="space-between" align="center" mb={10} direction={{ base: 'column', sm: 'row' }} gap={4}>
+                <Flex justify="space-between" align="center" mb={6} direction={{ base: 'column', sm: 'row' }} gap={4}>
                     <Box>
                         <Heading size="lg" mb={2}>
                             {currentName}
@@ -218,9 +242,31 @@ const ChamaDetails = () => {
                     </Box>
                     <Flex gap={3}>
                         <Button variant="outline" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
-                        <Button leftIcon={<FaPlus />} variant="solid" colorScheme="purple" as={RouterLink} to="/contribution">Make Contribution</Button>
+                        <Button leftIcon={<FaPlus />} variant="solid" colorScheme="orange" bg="brand.500" _hover={{ bg: 'brand.400' }} as={RouterLink} to="/contribution">Make Contribution</Button>
                     </Flex>
                 </Flex>
+
+                {/* Payday Celebration Banner */}
+                {showPaydayCelebration && (
+                    <Box mb={6}>
+                        <PaydayCelebration
+                            userName={user?.displayName || 'Friend'}
+                            amount="45,000 KES (0.0015 BTC)"
+                            onClose={() => setShowPaydayCelebration(false)}
+                        />
+                    </Box>
+                )}
+
+                {/* Payout Countdown & Queue */}
+                <Grid templateColumns={{ base: '1fr', lg: '2fr 1fr' }} gap={6} mb={10}>
+                    <PayoutCountdown
+                        nextPayoutDate={nextPayoutDate}
+                        nextRecipient={user?.displayName || 'You'}
+                        payoutAmount="45,000 KES (0.0015 BTC)"
+                        isCurrentUser={true}
+                    />
+                    <PayoutQueue members={payoutQueueMembers} />
+                </Grid>
 
                 {/* Active Dashboard */}
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={10}>

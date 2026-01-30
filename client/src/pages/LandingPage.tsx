@@ -1,10 +1,10 @@
-import React from 'react'
-import { Box, Container, Heading, Text, Button, SimpleGrid, Icon, VStack, Flex, useColorModeValue, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, useDisclosure } from '@chakra-ui/react'
-import { FaBitcoin, FaHandshake, FaLock, FaUsers, FaPlus, FaArrowRight } from 'react-icons/fa'
-import { Link as RouterLink } from 'react-router-dom'
+import { Box, Container, Heading, Text, Button, SimpleGrid, Icon, VStack, Flex, useColorModeValue, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, useDisclosure, Tabs, TabList, TabPanels, Tab, TabPanel, FormControl, FormLabel, Input, Checkbox, Link as ChakraLink, InputGroup, InputRightElement, IconButton } from '@chakra-ui/react'
+import { FaBitcoin, FaHandshake, FaLock, FaUsers, FaPlus, FaArrowRight, FaEye, FaEyeSlash } from 'react-icons/fa'
+import { Link as RouterLink, useNavigate } from 'react-router-dom'
 
 import { useWallet } from '../context/WalletContext'
-import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import React, { useState } from 'react'
 
 const Feature = ({ icon, title, text }: { icon: any; title: string; text: string }) => {
     return (
@@ -30,14 +30,43 @@ const Feature = ({ icon, title, text }: { icon: any; title: string; text: string
 
 const LandingPage = () => {
     const { connectWallet, isConnected, myChamas, setActiveChama } = useWallet()
+    const { login, signup } = useAuth()
     const navigate = useNavigate()
-
-    const handleGetStarted = () => {
-        navigate('/auth')
-    }
-
     const { isOpen, onOpen, onClose } = useDisclosure()
 
+    // Form state
+    const [loginEmail, setLoginEmail] = useState('')
+    const [loginPassword, setLoginPassword] = useState('')
+    const [signupEmail, setSignupEmail] = useState('')
+    const [signupPassword, setSignupPassword] = useState('')
+    const [signupName, setSignupName] = useState('')
+    const [rememberMe, setRememberMe] = useState(false)
+    const [showLoginPassword, setShowLoginPassword] = useState(false)
+    const [showSignupPassword, setShowSignupPassword] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsLoading(true)
+        const success = await login(loginEmail, loginPassword)
+        setIsLoading(false)
+        if (success) {
+            onClose()
+            // Always redirect to dashboard
+            navigate('/dashboard')
+        }
+    }
+
+    const handleSignup = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsLoading(true)
+        const success = await signup(signupEmail, signupPassword, signupName)
+        setIsLoading(false)
+        if (success) {
+            onClose()
+            navigate('/dashboard')
+        }
+    }
 
 
 
@@ -116,46 +145,157 @@ const LandingPage = () => {
                 <ModalOverlay backdropFilter='blur(4px)' />
                 <ModalContent p={6} rounded="xl">
                     <ModalHeader textAlign="center">
-                        <Heading size="lg" color="brand.600">Get Started</Heading>
-                        <Text fontSize="sm" color="gray.500" fontWeight="normal" mt={2}>
-                            Join the future of cooperative savings.
+                        <Heading size="lg" color="brand.600">Welcome to Impact Chain</Heading>
+                        <Text fontSize="sm" color="gray.500" mt={2}>
+                            Already have an account? Log in to access your Chamas
                         </Text>
                     </ModalHeader>
                     <ModalCloseButton />
                     <ModalBody>
-                        <VStack spacing={4} pb={4}>
-                            <Button
-                                w="full"
-                                size="lg"
-                                h="70px"
-                                colorScheme="purple"
-                                variant="solid"
-                                shadow="md"
-                                _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
-                                onClick={() => navigate('/auth?tab=signup')}
-                                leftIcon={<Icon as={FaPlus} w={5} h={5} />}
-                            >
-                                <VStack align="start" spacing={0} px={2}>
-                                    <Text fontSize="md">Create New Account</Text>
-                                </VStack>
-                            </Button>
-                            <Button
-                                w="full"
-                                size="lg"
-                                h="70px"
-                                variant="outline"
-                                colorScheme="purple"
-                                borderColor="purple.200"
-                                _hover={{ bg: 'purple.50', transform: 'translateY(-2px)' }}
-                                onClick={() => navigate('/auth?tab=login')}
-                                leftIcon={<Icon as={FaArrowRight} w={5} h={5} />}
-                            >
-                                <VStack align="start" spacing={0} px={2}>
-                                    <Text fontSize="md">Log In</Text>
-                                    <Text fontSize="xs" fontWeight="normal" color="gray.500">Access your active Chamas</Text>
-                                </VStack>
-                            </Button>
-                        </VStack>
+                        <Tabs isFitted variant="enclosed" colorScheme="orange">
+                            <TabList mb={4}>
+                                <Tab _selected={{ color: 'brand.600', borderColor: 'brand.500' }}>
+                                    <Icon as={FaLock} mr={2} /> Log In
+                                </Tab>
+                                <Tab _selected={{ color: 'brand.600', borderColor: 'brand.500' }}>
+                                    <Icon as={FaPlus} mr={2} /> Sign Up
+                                </Tab>
+                            </TabList>
+
+                            <TabPanels>
+                                {/* Login Form */}
+                                <TabPanel px={0}>
+                                    <form onSubmit={handleLogin}>
+                                        <VStack spacing={4}>
+                                            <FormControl isRequired>
+                                                <FormLabel>Email or Phone</FormLabel>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="user@email.com or +254..."
+                                                    value={loginEmail}
+                                                    onChange={(e) => setLoginEmail(e.target.value)}
+                                                    focusBorderColor="brand.500"
+                                                />
+                                            </FormControl>
+
+                                            <FormControl isRequired>
+                                                <FormLabel>Password</FormLabel>
+                                                <InputGroup>
+                                                    <Input
+                                                        type={showLoginPassword ? 'text' : 'password'}
+                                                        placeholder="••••••••"
+                                                        value={loginPassword}
+                                                        onChange={(e) => setLoginPassword(e.target.value)}
+                                                        focusBorderColor="brand.500"
+                                                    />
+                                                    <InputRightElement>
+                                                        <IconButton
+                                                            aria-label="Toggle password"
+                                                            icon={showLoginPassword ? <FaEyeSlash /> : <FaEye />}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setShowLoginPassword(!showLoginPassword)}
+                                                        />
+                                                    </InputRightElement>
+                                                </InputGroup>
+                                            </FormControl>
+
+                                            <Flex w="full" justify="space-between" align="center">
+                                                <Checkbox
+                                                    colorScheme="orange"
+                                                    isChecked={rememberMe}
+                                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                                >
+                                                    Remember me
+                                                </Checkbox>
+                                                <ChakraLink color="brand.500" fontSize="sm" fontWeight="medium">
+                                                    Forgot Password?
+                                                </ChakraLink>
+                                            </Flex>
+
+                                            <Button
+                                                type="submit"
+                                                w="full"
+                                                colorScheme="orange"
+                                                bg="brand.500"
+                                                _hover={{ bg: 'brand.400' }}
+                                                isLoading={isLoading}
+                                                size="lg"
+                                            >
+                                                Log In
+                                            </Button>
+                                        </VStack>
+                                    </form>
+                                </TabPanel>
+
+                                {/* Signup Form */}
+                                <TabPanel px={0}>
+                                    <form onSubmit={handleSignup}>
+                                        <VStack spacing={4}>
+                                            <FormControl isRequired>
+                                                <FormLabel>Full Name</FormLabel>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="John Doe"
+                                                    value={signupName}
+                                                    onChange={(e) => setSignupName(e.target.value)}
+                                                    focusBorderColor="brand.500"
+                                                />
+                                            </FormControl>
+
+                                            <FormControl isRequired>
+                                                <FormLabel>Email or Phone</FormLabel>
+                                                <Input
+                                                    type="text"
+                                                    placeholder="user@email.com or +254..."
+                                                    value={signupEmail}
+                                                    onChange={(e) => setSignupEmail(e.target.value)}
+                                                    focusBorderColor="brand.500"
+                                                />
+                                            </FormControl>
+
+                                            <FormControl isRequired>
+                                                <FormLabel>Password</FormLabel>
+                                                <InputGroup>
+                                                    <Input
+                                                        type={showSignupPassword ? 'text' : 'password'}
+                                                        placeholder="••••••••"
+                                                        value={signupPassword}
+                                                        onChange={(e) => setSignupPassword(e.target.value)}
+                                                        focusBorderColor="brand.500"
+                                                    />
+                                                    <InputRightElement>
+                                                        <IconButton
+                                                            aria-label="Toggle password"
+                                                            icon={showSignupPassword ? <FaEyeSlash /> : <FaEye />}
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setShowSignupPassword(!showSignupPassword)}
+                                                        />
+                                                    </InputRightElement>
+                                                </InputGroup>
+                                            </FormControl>
+
+                                            <Button
+                                                type="submit"
+                                                w="full"
+                                                colorScheme="orange"
+                                                bg="brand.500"
+                                                _hover={{ bg: 'brand.400' }}
+                                                isLoading={isLoading}
+                                                size="lg"
+                                            >
+                                                Sign Up
+                                            </Button>
+
+                                            <Text fontSize="xs" color="gray.500" textAlign="center">
+                                                By signing up, you agree to our Terms of Service and Privacy Policy
+                                            </Text>
+                                        </VStack>
+                                    </form>
+                                </TabPanel>
+                            </TabPanels>
+                        </Tabs>
                     </ModalBody>
                 </ModalContent>
             </Modal>

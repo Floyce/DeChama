@@ -19,20 +19,26 @@ import {
     AlertIcon
 } from '@chakra-ui/react'
 import { QRCodeSVG } from 'qrcode.react'
-import { FaBitcoin, FaBolt, FaCheckCircle, FaDownload, FaShareAlt, FaArrowLeft } from 'react-icons/fa'
+import { FaBitcoin, FaBolt, FaCheckCircle, FaDownload, FaShareAlt, FaArrowLeft, FaHandHoldingUsd } from 'react-icons/fa'
 import { useWallet } from '../context/WalletContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link as RouterLink } from 'react-router-dom'
+import { FormControl, FormLabel, Input, AlertTitle, AlertDescription } from '@chakra-ui/react'
 
 const ContributionPage = () => {
     const { isConnected, connectWallet, formatCurrency } = useWallet()
     const navigate = useNavigate()
     const toast = useToast()
 
-    // States: 'idle' -> 'invoice' -> 'paid'
-    const [step, setStep] = useState<'idle' | 'invoice' | 'paid'>('idle')
+    // States: 'idle' -> 'mpesa' | 'invoice' -> 'paid'
+    const [step, setStep] = useState<'idle' | 'mpesa' | 'invoice' | 'paid'>('idle')
     const [loading, setLoading] = useState(false)
     const [invoice, setInvoice] = useState<string | null>(null)
     const [receiptData, setReceiptData] = useState<any>(null)
+
+    // M-Pesa Specific
+    const [mpesaPhone, setMpesaPhone] = useState('')
+    const [isMpesaSent, setIsMpesaSent] = useState(false)
+
 
     const generateInvoice = async () => {
         setLoading(true)
@@ -96,32 +102,131 @@ const ContributionPage = () => {
                         <Card variant="outline" borderColor="purple.500" borderWidth={2} shadow="md">
                             <CardBody py={10}>
                                 <VStack spacing={6}>
-                                    <Icon as={FaBolt} color="yellow.400" w={12} h={12} />
+                                    <Icon as={FaHandHoldingUsd} color="green.500" w={12} h={12} />
                                     <Box>
-                                        <Heading size="lg">{formatCurrency('0.005').btc}</Heading>
-                                        <Text color="gray.500">≈ {formatCurrency('0.005').local}</Text>
+                                        <Heading size="lg">{formatCurrency('0.005').local}</Heading>
+                                        <Text color="gray.500">≈ {formatCurrency('0.005').sats}</Text>
                                     </Box>
                                     <Divider />
-                                    <VStack fontSize="sm" color="gray.600" spacing={1}>
-                                        <Text>Beneficiary: <b>Chama Vault (Multi-Sig)</b></Text>
-                                        <Text>Fee: <b>~ 5 sats</b> (Lightning)</Text>
+
+                                    <VStack w="full" spacing={4}>
+                                        <Button
+                                            w="full"
+                                            size="lg"
+                                            height="70px"
+                                            colorScheme="green"
+                                            onClick={() => setStep('mpesa')}
+                                            leftIcon={<Image src="https://upload.wikimedia.org/wikipedia/commons/1/15/M-PESA_LOGO-01.svg" h="30px" mr={2} />}
+                                        >
+                                            <VStack align="start" spacing={0}>
+                                                <Text>Pay with M-Pesa</Text>
+                                                <Text fontSize="xs" fontWeight="normal" opacity={0.8}>Aza Finance Secure Gateway</Text>
+                                            </VStack>
+                                        </Button>
+
+                                        <Button
+                                            w="full"
+                                            variant="outline"
+                                            size="md"
+                                            colorScheme="purple"
+                                            leftIcon={<FaBitcoin />}
+                                            onClick={generateInvoice}
+                                            isLoading={loading}
+                                            loadingText="Generating Invoice..."
+                                        >
+                                            Pay with Bitcoin (Lightning)
+                                        </Button>
+
+                                        <Button
+                                            variant="link"
+                                            colorScheme="blue"
+                                            fontSize="sm"
+                                            as={RouterLink}
+                                            to="/learn"
+                                            leftIcon={<Icon as={FaBitcoin} />}
+                                        >
+                                            What's Bitcoin? Learn here
+                                        </Button>
                                     </VStack>
-                                    <Button
-                                        w="full"
-                                        size="lg"
-                                        colorScheme="purple"
-                                        isLoading={loading}
-                                        loadingText="Generating Invoice..."
-                                        onClick={generateInvoice}
-                                        leftIcon={<FaBolt />}
-                                    >
-                                        Pay with Lightning
-                                    </Button>
                                 </VStack>
                             </CardBody>
                         </Card>
                     </Box>
                 )}
+
+                {step === 'mpesa' && (
+                    <Box>
+                        <Heading size="md" mb={6} textAlign="center">M-Pesa Payment</Heading>
+                        <Card variant="outline" p={6}>
+                            <VStack spacing={6}>
+                                <FormControl id="phone">
+                                    <FormLabel>Confirmed Safaricom Number</FormLabel>
+                                    <Input
+                                        type="tel"
+                                        placeholder="0712 345 678"
+                                        value={mpesaPhone}
+                                        onChange={(e) => setMpesaPhone(e.target.value)}
+                                        size="lg"
+                                        rounded="md"
+                                    />
+                                </FormControl>
+
+                                {!isMpesaSent ? (
+                                    <Button
+                                        w="full"
+                                        colorScheme="green"
+                                        size="lg"
+                                        onClick={() => {
+                                            setIsMpesaSent(true)
+                                            // Simulate backend polling/confirmation
+                                            setTimeout(() => {
+                                                setReceiptData({
+                                                    id: 'MP-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                                                    date: new Date().toLocaleString(),
+                                                    amount: formatCurrency('0.005').local,
+                                                    method: 'M-Pesa / Aza Finance',
+                                                    status: 'Confirmed'
+                                                })
+                                                setStep('paid')
+                                            }, 8000)
+                                        }}
+                                        isDisabled={!mpesaPhone}
+                                    >
+                                        Initiate Payment
+                                    </Button>
+
+                                ) : (
+                                    <VStack w="full" spacing={6} align="stretch">
+                                        <Alert status="info" rounded="md">
+                                            <AlertIcon />
+                                            <Box>
+                                                <AlertTitle>Manual Transfer Required</AlertTitle>
+                                                <AlertDescription fontSize="sm">
+                                                    Send <b>{formatCurrency('0.005').local}</b> to Safaricom Number:
+                                                </AlertDescription>
+                                            </Box>
+                                        </Alert>
+
+                                        <Flex bg="gray.100" p={4} rounded="lg" justify="space-between" align="center">
+                                            <Text fontSize="xl" fontWeight="bold">0743 456 789</Text>
+                                            <Button size="sm" colorScheme="purple" onClick={() => { navigator.clipboard.writeText('0743 456 789'); toast({ title: 'Number Copied', status: 'success' }) }}>
+                                                Copy
+                                            </Button>
+                                        </Flex>
+
+                                        <Flex align="center" gap={3} justify="center" py={4}>
+                                            <Spinner color="green.500" />
+                                            <Text fontWeight="bold">Waiting for M-Pesa confirmation...</Text>
+                                        </Flex>
+
+                                        <Button variant="ghost" size="sm" onClick={() => setIsMpesaSent(false)}>Back</Button>
+                                    </VStack>
+                                )}
+                            </VStack>
+                        </Card>
+                    </Box>
+                )}
+
 
                 {step === 'invoice' && invoice && (
                     <Box textAlign="center">
