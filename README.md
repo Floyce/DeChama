@@ -1,29 +1,29 @@
-# ⚡ Impact Chain: Decentralized Community Savings
+#  Impact Chain: Decentralized Community Savings
 
 Impact Chain is a state-of-the-art **Bitcoin-native ROSCA (Rotating Savings and Credit Association)** platform designed to empower communities through transparent, trustless, and automated financial governance. Built for the modern age, it replaces manual tracking and verbal trust with cryptographically secure smart-governance and Lightning Network payments.
 
 ---
 
-## 💎 Core Features
+##  Core Features
 
-### 🏢 Chama Hub & Governance
+###  Chama Hub & Governance
 - **Discovery Engine**: Browse active Chamas or launch your own community circle in seconds.
 - **51% Consensus Model**: Strict democratic governance. Membership, loans, and withdrawals require a majority vote to execute.
 - **Strict Access Control**: Dashboards are locked behind a membership wall. Only approved members can view balance, rotation orders, or transaction history.
 
-### ⚡ Lightning-Native Finance
+###  Lightning-Native Finance
 - **Sats + KSH Display**: Dynamic currency bridging. View your savings in Bitcoin (Sats) and Kenyan Shillings (KSH) using real-time exchange rates.
 - **Automated Payouts**: The system automatically triggers rotation payouts to your saved Lightning address the moment the pool target is reached.
 - **Wallet of Satoshi Integration**: Seamlessly contribute via Lightning QR codes or deep-linking.
 
-### 🛡️ Security & Transparency
+###  Security & Transparency
 - **Unique Login References**: Every session generates a persistent IC-XXXX-XXXX tracking number for auditability.
 - **Proof-of-Payment**: Immutable digital receipts via Lightning payment hashes.
 - **Rotation Order**: Transparent join-date-based rotation ensures everyone knows exactly when their "payday" is coming.
 
 ---
 
-## 🚀 Tech Stack
+## Tech Stack
 
 - **Frontend**: React (TypeScript), Chakra UI (Glassmorphism design), Framer Motion.
 - **Backend**: FastAPI (Python), SQLAlchemy (Async), Pydantic.
@@ -33,7 +33,7 @@ Impact Chain is a state-of-the-art **Bitcoin-native ROSCA (Rotating Savings and 
 
 ---
 
-## 🛠️ Setup & Installation
+##  Setup & Installation
 
 ### 1. Prerequisites
 - Docker & Docker Compose
@@ -65,7 +65,7 @@ npm run dev
 
 ---
 
-## 📦 Deployment
+##  Deployment
 
 ### Backend (Cloud Run)
 1. Build the Docker image: `docker build -t gcr.io/impact-chain/backend .`
@@ -78,7 +78,7 @@ npm run dev
 
 ---
 
-## 📜 Database Migrations
+##  Database Migrations
 To initialize the governance and request system:
 1. Run the `add_requests_tables.sql` located in `backend/sql/`.
 2. Ensure `chama_memberships` table has the `status` column for access control.
