@@ -27,6 +27,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     phoneNumber = Column(String, unique=True, index=True)
+    displayName = Column(String)
     country_code = Column(String)
     wallet_address = Column(String)
     referralCode = Column(String)
@@ -37,6 +38,7 @@ class User(Base):
     contributions = relationship("Contribution", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
     nfts = relationship("NFT", back_populates="user")
+    transactions = relationship("Transaction", back_populates="user")
 
 class Chama(Base):
     __tablename__ = "chamas"
@@ -46,6 +48,9 @@ class Chama(Base):
     description = Column(String)
     creator_id = Column(String, ForeignKey("users.id"))
     contribution_amount_sats = Column(BigInteger, default=0)
+    target_goal_sats = Column(BigInteger, default=0) # New field
+    max_members = Column(Integer, default=100)       # New field
+    member_count = Column(Integer, default=1)       # New field
     payout_schedule = Column(String) # Cron or descriptive string
     current_balance_sats = Column(BigInteger, default=0)
     currency = Column(String, default="BTC")
@@ -55,6 +60,7 @@ class Chama(Base):
     contributions = relationship("Contribution", back_populates="chama")
     payouts = relationship("Payout", back_populates="chama")
     votes = relationship("MemberVote", back_populates="chama")
+    transactions = relationship("Transaction", back_populates="chama")
 
 class ChamaMembership(Base):
     __tablename__ = "chama_memberships"
@@ -84,6 +90,24 @@ class Contribution(Base):
     chama = relationship("Chama", back_populates="contributions")
     nft = relationship("NFT", back_populates="contribution", uselist=False)
 
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    chama_id = Column(String, ForeignKey("chamas.id"), nullable=True) # Nullable for solo
+    type = Column(String) # 'deposit', 'withdrawal', 'transfer'
+    amount_sats = Column(BigInteger, nullable=False)
+    reason = Column(String, nullable=False)
+    payment_hash = Column(String, nullable=True)
+    bolt11 = Column(String, nullable=True)
+    status = Column(Enum(TransactionStatus), default=TransactionStatus.PENDING)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="transactions")
+    chama = relationship("Chama", back_populates="transactions")
+
 class Payout(Base):
     __tablename__ = "payouts"
 
@@ -91,6 +115,7 @@ class Payout(Base):
     chama_id = Column(String, ForeignKey("chamas.id"))
     recipient_id = Column(String, ForeignKey("users.id"))
     amount_sats = Column(BigInteger, nullable=False)
+    memo = Column(String, nullable=False) # Fix 9: Required reason
     status = Column(Enum(TransactionStatus), default=TransactionStatus.PENDING)
     scheduled_date = Column(DateTime(timezone=True))
     executed_at = Column(DateTime(timezone=True))

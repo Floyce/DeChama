@@ -1,16 +1,18 @@
 import React from 'react'
-import { Box, Flex, Heading, Button, Container, Text, Link, Menu, MenuButton, MenuList, MenuItem, Icon, Avatar, HStack, Divider, Select } from '@chakra-ui/react'
+import { Box, Flex, Heading, Button, Container, Text, Link, Menu, MenuButton, MenuList, MenuItem, Icon, Avatar, HStack, Divider, Select, useDisclosure } from '@chakra-ui/react'
 import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom'
-import { FaChevronDown, FaWallet, FaUserCircle } from 'react-icons/fa'
+import { FaChevronDown, FaWallet, FaUserCircle, FaInfoCircle } from 'react-icons/fa'
 import { useWallet } from '../context/WalletContext'
+import WalletConnectModal from './WalletConnectModal'
 
 import { useAuth } from '../context/AuthContext'
 
 const Navbar = () => {
     const location = useLocation()
     const navigate = useNavigate()
-    const { isConnected, connectWallet, address, myChamas, disconnectWallet, currency, setCurrency } = useWallet()
+    const { isConnected, connectWallet, address, myChamas, disconnectWallet, currency, setCurrency, setDisplayName } = useWallet()
     const { user, isAuthenticated, logout } = useAuth()
+    const { isOpen, onOpen, onClose } = useDisclosure()
 
     const isActive = (path: string) => {
         return location.pathname === path ? 'purple.600' : 'gray.600'
@@ -25,7 +27,7 @@ const Navbar = () => {
             <Container maxW="container.xl">
                 <Flex h={16} alignItems="center" justifyContent="space-between">
                     <Heading size="md" color="purple.600" letterSpacing="tight" as={RouterLink} to="/">
-                        ImpactChain
+                        Impact Chain
                     </Heading>
 
                     <Flex alignItems="center" gap={6}>
@@ -57,7 +59,7 @@ const Navbar = () => {
                         {isAuthenticated && (
                             <Menu>
                                 <MenuButton as={Button} rightIcon={<FaChevronDown />} variant="ghost" size="sm">
-                                    My Chamas
+                                    Chama Hub
                                 </MenuButton>
                                 <MenuList>
                                     {myChamas.length > 0 ? (
@@ -95,16 +97,30 @@ const Navbar = () => {
                                 </Select>
                             )}
 
-                            {/* Wallet Connection */}
+                            {/* Wallet Connection (Fix 2 Improved) */}
                             {isConnected ? (
-                                <Button size="sm" variant="outline" colorScheme="orange" leftIcon={<FaWallet />} onClick={disconnectWallet}>
-                                    {address?.slice(0, 4)}...{address?.slice(-4)}
-                                </Button>
+                                <Menu>
+                                    <MenuButton as={Button} size="sm" variant="outline" colorScheme="orange" leftIcon={<FaWallet />}>
+                                        {address?.slice(0, 4)}...{address?.slice(-4)}
+                                    </MenuButton>
+                                    <MenuList>
+                                        <MenuItem isDisabled fontSize="xs">Connected as: {address}</MenuItem>
+                                        <Divider />
+                                        <MenuItem onClick={onOpen}>Switch Wallet</MenuItem>
+                                        <MenuItem color="red.500" onClick={disconnectWallet}>Disconnect</MenuItem>
+                                    </MenuList>
+                                </Menu>
                             ) : (
-                                <Button size="sm" colorScheme="orange" variant="ghost" onClick={connectWallet} title="Connect Wallet">
-                                    <Icon as={FaWallet} />
+                                <Button size="sm" variant="ghost" colorScheme="orange" leftIcon={<FaWallet />} onClick={onOpen} title="Connect Wallet">
+                                    Connect
                                 </Button>
                             )}
+                            
+                            <WalletConnectModal isOpen={isOpen} onClose={onClose} onConnect={(type, addr) => {
+                                if (type === 'ln_address' && addr) setDisplayName(addr);
+                                connectWallet();
+                                onClose();
+                            }} />
 
                             {/* User Profile */}
                             {isAuthenticated ? (
@@ -125,7 +141,7 @@ const Navbar = () => {
                                 </Menu>
                             ) : (
                                 <Button as={RouterLink} to="/auth" colorScheme="purple" size="sm">
-                                    Login / Sign Up
+                                    Get Started
                                 </Button>
                             )}
                         </Flex>
@@ -141,7 +157,7 @@ const Footer = () => {
         <Box bg="gray.50" py={10} mt={10}>
             <Container maxW="container.xl">
                 <Text textAlign="center" color="gray.500" fontSize="sm">
-                    © {new Date().getFullYear()} ImpactChain. Native Bitcoin Chamas.
+                    © {new Date().getFullYear()} Impact Chain. Building the future of community finance.
                 </Text>
             </Container>
         </Box>

@@ -1,17 +1,20 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react'
 import { useToast } from '@chakra-ui/react'
 
+const API_BASE = '/api'
+
 interface User {
     id: string
     phoneNumber: string
     displayName: string
-    referralCode: string
+    referralCode?: string
     referredBy?: string
+    email?: string
 }
-
 
 interface AuthContextType {
     user: User | null
+    token: string | null
     isAuthenticated: boolean
     login: (phoneNumber: string, password: string) => Promise<boolean>
     signup: (phoneNumber: string, password: string, displayName: string, referralCode?: string) => Promise<boolean>
@@ -23,78 +26,101 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null)
+    const [token, setToken] = useState<string | null>(null)
     const [logs, setLogs] = useState<string[]>([])
     const toast = useToast()
 
-    // Load user from local storage on mount
     useEffect(() => {
         const savedUser = localStorage.getItem('impactchain_user')
-        if (savedUser) {
+        const savedToken = localStorage.getItem('impactchain_token')
+        if (savedUser && savedToken) {
             setUser(JSON.parse(savedUser))
+            setToken(savedToken)
         }
     }, [])
 
     const logAction = (action: string) => {
         const timestamp = new Date().toISOString()
-        const ip = '192.168.1.1' // Mock IP
-        const logEntry = `[${timestamp}] [IP: ${ip}] ${action}`
+        const logEntry = `[${timestamp}] ${action}`
         setLogs(prev => [...prev, logEntry])
-        console.log("Security Log:", logEntry)
+        console.log('Security Log:', logEntry)
     }
 
-    const login = async (phoneNumber: string, password: string) => {
+    const login = async (phoneNumber: string, password: string): Promise<boolean> => {
         try {
-            // Mock login - check localStorage for existing users
-            const usersData = localStorage.getItem('impactchain_users')
-            const users = usersData ? JSON.parse(usersData) : {}
-
-            if (users[phoneNumber] && users[phoneNumber].password === password) {
-                const userData = users[phoneNumber]
-                setUser(userData)
-                localStorage.setItem('impactchain_user', JSON.stringify(userData))
-                logAction(`User logged in: ${phoneNumber}`)
-                toast({ title: 'Welcome back!', status: 'success', duration: 2000 })
-                return true
-            } else {
-                toast({ title: 'Invalid credentials', status: 'error', duration: 3000 })
-                logAction(`Failed login attempt: ${phoneNumber}`)
+            const res = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: phoneNumber, password }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                toast({ title: data.detail || 'Invalid credentials', status: 'error', duration: 3000 })
+                logAction(`Failed login: ${phoneNumber}`)
                 return false
             }
-        } catch (error) {
-            toast({ title: 'Login Error', status: 'error', duration: 3000 })
+            const userData: User = {
+                id: data.user.id,
+                phoneNumber: data.user.phoneNumber || phoneNumber,
+                displayName: data.user.displayName || data.user.display_name || phoneNumber,
+                referralCode: data.user.referralCode,
+                referredBy: data.user.referredBy,
+                email: data.user.email,
+            }
+            setUser(userData)
+            setToken(data.access_token)
+            localStorage.setItem('impactchain_user', JSON.stringify(userData))
+            localStorage.setItem('impactchain_token', data.access_token)
+            logAction(`User logged in: ${phoneNumber}`)
+            toast({ title: 'Welcome back!', status: 'success', duration: 2000 })
+            return true
+        } catch (err) {
+            toast({ title: 'Login failed — is the backend running?', status: 'error', duration: 4000 })
             return false
         }
     }
 
-    const signup = async (phoneNumber: string, password: string, displayName: string, referralCode?: string) => {
+    const signup = async (
+        phoneNumber: string,
+        password: string,
+        displayName: string,
+        referralCode?: string
+    ): Promise<boolean> => {
         try {
-            // Mock signup - save to localStorage
-            const usersData = localStorage.getItem('impactchain_users')
-            const users = usersData ? JSON.parse(usersData) : {}
-
-            if (users[phoneNumber]) {
-                toast({ title: 'Phone number already registered', status: 'error', duration: 3000 })
+            // Generate a synthetic email from phone so backend email field is satisfied
+            const syntheticEmail = `${phoneNumber.replace(/[^a-zA-Z0-9]/g, '')}@dechama.app`
+            const res = await fetch(`${API_BASE}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: syntheticEmail,
+                    phoneNumber,
+                    display_name: displayName,
+                    password,
+                    referralCode: referralCode || null,
+                }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                toast({ title: data.detail || 'Registration failed', status: 'error', duration: 3000 })
                 return false
             }
-
-            const newUser: User = {
-                id: `user_${Date.now()}`,
-                phoneNumber,
-                displayName,
-                referralCode: referralCode || `REF${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-                referredBy: referralCode
+            const userData: User = {
+                id: data.user.id,
+                phoneNumber: data.user.phoneNumber || phoneNumber,
+                displayName: data.user.displayName || data.user.display_name || displayName,
+                referralCode: data.user.referralCode,
+                email: data.user.email,
             }
-
-            users[phoneNumber] = { ...newUser, password }
-            localStorage.setItem('impactchain_users', JSON.stringify(users))
-
-            setUser(newUser)
-            localStorage.setItem('impactchain_user', JSON.stringify(newUser))
+            setUser(userData)
+            setToken(data.access_token)
+            localStorage.setItem('impactchain_user', JSON.stringify(userData))
+            localStorage.setItem('impactchain_token', data.access_token)
             logAction(`New user registered: ${phoneNumber}`)
-            toast({ title: 'Account Created Successfully!', status: 'success', duration: 2000 })
+            toast({ title: 'Account Created!', status: 'success', duration: 2000 })
             return true
-        } catch (error) {
-            toast({ title: 'Signup Error', status: 'error', duration: 3000 })
+        } catch (err) {
+            toast({ title: 'Signup failed — is the backend running?', status: 'error', duration: 4000 })
             return false
         }
     }
@@ -102,12 +128,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logout = () => {
         logAction(`User logged out: ${user?.phoneNumber}`)
         setUser(null)
+        setToken(null)
         localStorage.removeItem('impactchain_user')
+        localStorage.removeItem('impactchain_token')
         toast({ title: 'Logged out', status: 'info' })
     }
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, logs }}>
+        <AuthContext.Provider value={{ user, token, isAuthenticated: !!user, login, signup, logout, logs }}>
             {children}
         </AuthContext.Provider>
     )
@@ -115,8 +143,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
     const context = useContext(AuthContext)
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider')
-    }
+    if (!context) throw new Error('useAuth must be used within an AuthProvider')
     return context
 }

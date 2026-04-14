@@ -41,38 +41,69 @@ const ContributionPage = () => {
 
 
     const generateInvoice = async () => {
+        const savedUser = localStorage.getItem('impactchain_user')
+        if (!savedUser || !activeChama) {
+            toast({ title: 'Error', description: 'User or Active Chama not found', status: 'error' })
+            return
+        }
+        const user = JSON.parse(savedUser)
+        
         setLoading(true)
-        // Mock API call to LNBits / Lightning Provider
-        setTimeout(() => {
-            const mockInvoice = 'lnbc100n1p3...' + Math.random().toString(36).substring(7)
-            setInvoice(mockInvoice)
+        try {
+            const res = await fetch('/api/contributions/create-invoice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: user.id,
+                    chama_id: activeChama,
+                    amount_sats: 500000 // Hardcoded for MVP, should be dynamic
+                }),
+            })
+            const data = await res.json()
+            if (res.ok) {
+                setInvoice(data.payment_request)
+                setStep('invoice')
+                startPolling(data.payment_hash)
+            } else {
+                toast({ title: 'Failed to generate invoice', description: data.detail, status: 'error' })
+            }
+        } catch (err) {
+            toast({ title: 'Service Unavailable', description: 'Could not reach the payment gateway', status: 'error' })
+        } finally {
             setLoading(false)
-            setStep('invoice')
-
-            // Simulate Payment Listener
-            simulatePayment()
-        }, 1500)
+        }
     }
 
-    const simulatePayment = () => {
-        // In a real app, this would be a websocket or polling
-        setTimeout(() => {
-            setStep('paid')
-            setReceiptData({
-                id: 'TX-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-                date: new Date().toLocaleString(),
-                amount: '0.005 BTC',
-                method: 'Lightning Network',
-                status: 'Confirmed'
-            })
-            toast({
-                title: 'Payment Received!',
-                description: 'Your contribution has been recorded on-chain.',
-                status: 'success',
-                duration: 5000,
-                isClosable: true
-            })
-        }, 5000) // 5 seconds to pay
+    const startPolling = (paymentHash: string) => {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/contributions/check-payment/${paymentHash}`)
+                const data = await res.json()
+                if (data.status === 'paid') {
+                    clearInterval(interval)
+                    setStep('paid')
+                    setReceiptData({
+                        id: paymentHash.substring(0, 10).toUpperCase(),
+                        date: new Date().toLocaleString(),
+                        amount: '500,000 sats',
+                        method: 'Lightning Network (Real Payment)',
+                        status: 'Confirmed'
+                    })
+                    toast({
+                        title: 'Payment Received!',
+                        description: 'Your contribution has been recorded and the group balance updated.',
+                        status: 'success',
+                        duration: 5000,
+                        isClosable: true
+                    })
+                }
+            } catch (err) {
+                console.error("Polling error", err)
+            }
+        }, 3000) // Poll every 3 seconds
+
+        // Cleanup after 10 minutes
+        setTimeout(() => clearInterval(interval), 600000)
     }
 
     if (!isConnected) {

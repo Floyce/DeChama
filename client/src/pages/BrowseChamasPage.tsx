@@ -138,22 +138,32 @@ const BrowseChamasPage = () => {
 
                                         <Heading size="md" mb={2}>{chama.name}</Heading>
 
-                                        <VStack align="start" spacing={1} mb={6}>
+                                        <VStack align="start" spacing={1} mb={4}>
                                             <HStack color="gray.600">
                                                 <Icon as={FaUsers} />
-                                                <Text>Group of {chama.expected_members}</Text>
+                                                <Text>Group of {chama.expected_members || 12}</Text>
+                                            </HStack>
+                                            <HStack color="gray.600">
+                                                <Icon as={FaHandshake} />
+                                                <Text>Plan: {chama.payout_schedule || 'Monthly rotation'}</Text>
                                             </HStack>
                                             <HStack color="gray.600">
                                                 <Icon as={FaHandHoldingUsd} />
                                                 <Text>
-                                                    {formatCurrency(btcAmount).btc} / {chama.frequency}
-                                                    <Text as="span" fontSize="xs" ml={2} color="gray.400">
-                                                        (≈ {formatCurrency(btcAmount).local})
-                                                    </Text>
+                                                    {formatCurrency(btcAmount).btc} / Cycle
                                                 </Text>
                                             </HStack>
-
                                         </VStack>
+
+                                        {/* Fix 12: Chama details section */}
+                                        <Box bg="gray.50" p={3} rounded="lg" mb={6} fontSize="xs">
+                                            <Text fontWeight="bold" color="gray.500" mb={1} textTransform="uppercase">Rules & Governance</Text>
+                                            <VStack align="start" spacing={1} color="gray.600">
+                                                <Text>• Governance: 51% Member Consensus</Text>
+                                                <Text>• Entry Fee: 0 sats (Early Adopter)</Text>
+                                                <Text>• Min Credit Rep: 50/100</Text>
+                                            </VStack>
+                                        </Box>
 
                                         <Button
                                             w="full"

@@ -12,6 +12,7 @@ import BrowseChamasPage from './pages/BrowseChamasPage'
 import ChamaDetails from './pages/ChamaDetails'
 import SoloSavingsPage from './pages/SoloSavingsPage'
 import WelcomePage from './pages/WelcomePage'
+import ChamaDashboardPage from './pages/ChamaDashboardPage'
 
 function App() {
     return (
@@ -34,6 +35,7 @@ function App() {
                     <Route path="create-chama" element={<CreateChamaPage />} />
                     <Route path="browse-chamas" element={<BrowseChamasPage />} />
                     <Route path="solo-savings" element={<SoloSavingsPage />} />
+                    <Route path="chama-dashboard/:id" element={<ChamaDashboardPage />} />
                     <Route path="welcome" element={<WelcomePage />} />
                 </Route>
             </Routes>

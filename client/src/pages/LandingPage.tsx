@@ -30,9 +30,10 @@ const Feature = ({ icon, title, text }: { icon: any; title: string; text: string
 
 const LandingPage = () => {
     const { connectWallet, isConnected, myChamas, setActiveChama } = useWallet()
-    const { login, signup } = useAuth()
+    const { login, signup, isAuthenticated } = useAuth()
     const navigate = useNavigate()
     const { isOpen, onOpen, onClose } = useDisclosure()
+    const { isOpen: isRedirectOpen, onOpen: onRedirectOpen, onClose: onRedirectClose } = useDisclosure()
 
     // Form state
     const [loginEmail, setLoginEmail] = useState('')
@@ -102,7 +103,7 @@ const LandingPage = () => {
                         <Heading size="3xl" fontWeight="extrabold" letterSpacing="tight" lineHeight="1.2">
                             Reinvent Trust. <br />
                             <Text as="span" bgGradient="linear(to-r, brand.400, brand.600)" bgClip="text">
-                                Chamas, Decentralized.
+                                Savings, Decentralized.
                             </Text>
                         </Heading>
                         <Text fontSize="xl" opacity={0.8} maxW="2xl" color="gray.300">
@@ -110,18 +111,33 @@ const LandingPage = () => {
                         </Text>
 
                         <Flex gap={4} pt={4} direction={{ base: 'column', sm: 'row' }}>
-                            <Button
-                                onClick={onOpen}
-                                size="lg"
-                                rounded="full"
-                                bgGradient="linear(to-r, brand.500, brand.600)"
-                                color="white"
-                                _hover={{ bgGradient: "linear(to-r, brand.400, brand.500)", transform: 'scale(1.05)' }}
-                                transition="all 0.2s"
-                                px={10}
-                            >
-                                Get Started
-                            </Button>
+                             {isAuthenticated ? (
+                                <Button
+                                    onClick={onRedirectOpen}
+                                    size="lg"
+                                    rounded="full"
+                                    bgGradient="linear(to-r, brand.500, brand.600)"
+                                    color="white"
+                                    _hover={{ bgGradient: "linear(to-r, brand.400, brand.500)", transform: 'scale(1.05)' }}
+                                    transition="all 0.2s"
+                                    px={10}
+                                >
+                                    Get Started
+                                </Button>
+                            ) : (
+                                <Button
+                                    onClick={onOpen}
+                                    size="lg"
+                                    rounded="full"
+                                    bgGradient="linear(to-r, brand.500, brand.600)"
+                                    color="white"
+                                    _hover={{ bgGradient: "linear(to-r, brand.400, brand.500)", transform: 'scale(1.05)' }}
+                                    transition="all 0.2s"
+                                    px={10}
+                                >
+                                    Get Started
+                                </Button>
+                            )}
                             <Button
                                 as={RouterLink}
                                 to="/learn"
@@ -147,7 +163,7 @@ const LandingPage = () => {
                     <ModalHeader textAlign="center">
                         <Heading size="lg" color="brand.600">Welcome to Impact Chain</Heading>
                         <Text fontSize="sm" color="gray.500" mt={2}>
-                            Already have an account? Log in to access your Chamas
+                            Already have an account? Log in to access your Hub
                         </Text>
                     </ModalHeader>
                     <ModalCloseButton />
@@ -300,7 +316,20 @@ const LandingPage = () => {
                 </ModalContent>
             </Modal>
 
-            {/* Features Section */}
+            {/* Already Logged In Dialog */}
+            <Modal isOpen={isRedirectOpen} onClose={onRedirectClose} isCentered size="sm">
+                <ModalOverlay backdropFilter="blur(4px)" />
+                <ModalContent p={4}>
+                    <ModalHeader textAlign="center">Notice</ModalHeader>
+                    <ModalBody>
+                        <Text textAlign="center">You are already logged in. Proceed to your Impact Chain dashboard?</Text>
+                    </ModalBody>
+                    <ModalFooter justifyContent="center" gap={4}>
+                        <Button colorScheme="purple" onClick={() => navigate('/dashboard')}>Yes, Proceed</Button>
+                        <Button variant="ghost" onClick={onRedirectClose}>Cancel</Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
             <Container maxW="container.xl" py={20}>
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={8}>
                     <Feature

@@ -79,6 +79,7 @@ const CreateChamaPage = () => {
         referralBonus: '',
         // Step 3
         contributionAmount: '',
+        target_goal_btc: '',
         frequency: 'Monthly',
         contributionWindow: '1st-5th',
         // Step 4
@@ -161,7 +162,7 @@ const CreateChamaPage = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...formData,
-                    userId: user.id
+                    creator_id: user.id
                 })
             })
             const data = await res.json()
@@ -172,13 +173,13 @@ const CreateChamaPage = () => {
                 setActiveChama(formData.name)
 
                 toast({
-                    title: 'Chama Created Successfully!',
-                    description: `Smart Contract Deployed. Fee paid.`,
+                    title: 'Chama Created!',
+                    description: `Successfully registered in the hub.`,
                     status: 'success',
                     duration: 5000,
                     isClosable: true,
                 })
-                navigate(`/chama/${encodeURIComponent(formData.name)}`)
+                navigate('/dashboard')
             } else {
                 toast({ title: 'Error creating Chama', description: data.error, status: 'error' })
             }
@@ -268,6 +269,10 @@ const CreateChamaPage = () => {
                         <FormControl isRequired>
                             <FormLabel>Contribution Amount (BTC)</FormLabel>
                             <Input value={formData.contributionAmount} onChange={(e) => updateField('contributionAmount', e.target.value)} placeholder="0.005" />
+                        </FormControl>
+                        <FormControl isRequired>
+                            <FormLabel>Target Savings Goal (BTC)</FormLabel>
+                            <Input value={formData.target_goal_btc} onChange={(e) => updateField('target_goal_btc', e.target.value)} placeholder="0.5" />
                         </FormControl>
                         <FormControl>
                             <FormLabel>Frequency</FormLabel>
@@ -364,8 +369,8 @@ const CreateChamaPage = () => {
                                 Connect Wallet to Deploy
                             </Button>
                         ) : (
-                            <Button onClick={handleDeploy} colorScheme="purple" size="lg" rounded="full" isLoading={isDeploying} loadingText="Deploying Contract...">
-                                DEPLOY SMART CONTRACT
+                            <Button onClick={handleDeploy} colorScheme="purple" size="lg" rounded="full" isLoading={isDeploying} loadingText="Launching...">
+                                LAUNCH CHAMA
                             </Button>
                         )}
                     </VStack>

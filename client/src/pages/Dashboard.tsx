@@ -15,12 +15,20 @@ import {
     Tag,
     Badge,
     HStack,
-    Divider
+    Divider,
+    ModalCloseButton,
+    Tabs,
+    TabList,
+    TabPanels,
+    Tab,
+    TabPanel,
+    Spinner
 } from '@chakra-ui/react'
 import { FaPlus, FaSearch, FaArrowRight, FaWallet, FaUserFriends, FaPiggyBank, FaBookOpen, FaChartLine, FaBell, FaCrown } from 'react-icons/fa'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
 import { useAuth } from '../context/AuthContext'
+import Tutorial from '../components/Tutorial'
 
 const Dashboard = () => {
     const { isConnected, displayName, myChamas, setActiveChama, balance, fetchMyChamas, address, formatCurrency, preferredDisplay, setPreferredDisplay } = useWallet()
@@ -28,17 +36,81 @@ const Dashboard = () => {
     const navigate = useNavigate()
     const cardBg = useColorModeValue('white', 'gray.800')
 
+    const [stats, setStats] = useState({ total_savings_sats: 0, active_groups: 0, payouts_received_sats: 0 })
+    const [chamaHub, setChamaHub] = useState({ joined: [], available: [] })
+    const [transactions, setTransactions] = useState([])
+    const [isLoadingHub, setIsLoadingHub] = useState(true)
+    const [showTutorial, setShowTutorial] = useState(false)
+
+    // Fix 6: Fetch Real Stats
+    const fetchStats = async () => {
+        if (user?.id) {
+            try {
+                const res = await fetch(`/api/user/stats?user_id=${user.id}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setStats(data)
+                }
+            } catch (err) {
+                console.error("Failed to fetch stats", err)
+            }
+        }
+    }
+
+    const fetchChamaHub = async () => {
+        if (user?.id) {
+            setIsLoadingHub(true)
+            try {
+                const res = await fetch(`/api/chamas/hub?user_id=${user.id}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setChamaHub(data)
+                }
+            } catch (err) {
+                console.error("Failed to fetch hub", err)
+            } finally {
+                setIsLoadingHub(false)
+            }
+        }
+    }
+
+    const fetchTransactions = async () => {
+        if (user?.id) {
+            try {
+                const res = await fetch(`/api/transactions?user_id=${user.id}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setTransactions(data)
+                }
+            } catch (err) {
+                console.error("Failed to fetch tx", err)
+            }
+        }
+    }
+
     // Protect Route & Refresh Data
     useEffect(() => {
         if (!user && !isConnected) {
             navigate('/auth')
         } else {
-            fetchMyChamas() // Refresh on load
+            fetchChamaHub()
+            fetchStats()
+            fetchTransactions()
+
+            // Fix 5: One-time tutorial logic
+            const hasSeenTutorial = localStorage.getItem(`tutorial_seen_${user?.id}`)
+            if (!hasSeenTutorial && user) {
+                setShowTutorial(true)
+            }
         }
-    }, [user, isConnected, navigate, fetchMyChamas])
+    }, [user, isConnected])
+
+    const closeTutorial = () => {
+        setShowTutorial(false)
+        if (user?.id) localStorage.setItem(`tutorial_seen_${user.id}`, 'true')
+    }
 
     const handleEnterChama = (chamaName: string) => {
-        // Set the active Chama context so the detail page knows what to load
         setActiveChama(chamaName)
         navigate(`/chama/${encodeURIComponent(chamaName)}`)
     }
@@ -79,12 +151,14 @@ const Dashboard = () => {
                         <Flex align="center" gap={4}>
                             <Icon as={FaWallet} color="brand.500" w={5} h={5} />
                             <Box>
-                                <Text fontSize="xs" color="gray.500" fontWeight="bold">TOTAL ASSETS (Tap to toggle)</Text>
+                                <Text fontSize="xs" color="gray.500" fontWeight="bold">TOTAL ASSETS (Fix 6)</Text>
                                 <Heading size="md" color="brand.600">
-                                    {preferredDisplay === 'BTC' ? formatCurrency(balance).btc : formatCurrency(balance).local}
+                                    {preferredDisplay === 'BTC' 
+                                        ? `${(stats.total_savings_sats / 100000000).toFixed(6)} BTC` 
+                                        : formatCurrency((stats.total_savings_sats / 100000000).toString()).local}
                                 </Heading>
                                 <Text fontSize="xs" color="gray.500">
-                                    {preferredDisplay === 'BTC' ? `≈ ${formatCurrency(balance).local}` : `≈ ${formatCurrency(balance).sats}`}
+                                    {stats.total_savings_sats.toLocaleString()} sats
                                 </Text>
                             </Box>
                         </Flex>
@@ -92,50 +166,130 @@ const Dashboard = () => {
                 </Flex>
 
 
-                {/* My Chamas Section */}
-                <Heading size="md" mb={6}>Your Active Chamas</Heading>
+                {/* Chama Hub Section */}
+                <Flex justify="space-between" align="center" mb={6}>
+                    <Heading size="md">Chama Hub</Heading>
+                    <HStack>
+                        <Button as={RouterLink} to="/create-chama" size="sm" colorScheme="purple" leftIcon={<FaPlus />}>
+                            Launch Chama
+                        </Button>
+                    </HStack>
+                </Flex>
 
-                {myChamas.length > 0 ? (
-                    <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6} mb={12}>
-                        {myChamas.map((chamaName, index) => (
-                            <Card
-                                key={index}
-                                bg={cardBg}
-                                rounded="xl"
-                                shadow="md"
-                                border="1px solid"
-                                borderColor="gray.100"
-                                _hover={{ shadow: 'xl', transform: 'translateY(-2px)' }}
-                                transition="all 0.2s"
-                            >
-                                <CardBody>
-                                    <Flex justify="space-between" align="start" mb={4}>
-                                        <Icon as={FaUserFriends} color="brand.500" w={8} h={8} />
-                                        <Badge colorScheme="green" variant="solid" rounded="full" px={2}>Active</Badge>
-                                    </Flex>
-                                    <Heading size="md" mb={2}>{chamaName}</Heading>
-                                    <Text color="gray.500" fontSize="sm" mb={6}>
-                                        Next payout in 12 days. You are in good standing.
-                                    </Text>
+                <Tabs variant="enclosed" colorScheme="purple" mb={12}>
+                    <TabList>
+                        <Tab fontWeight="bold">Joined Chamas ({chamaHub.joined.length})</Tab>
+                        <Tab fontWeight="bold">Available Chamas ({chamaHub.available.length})</Tab>
+                    </TabList>
+                    <TabPanels>
+                        <TabPanel px={0} py={6}>
+                            {isLoadingHub ? (
+                                <Flex justify="center" py={10}><Spinner color="purple.500" /></Flex>
+                            ) : chamaHub.joined.length > 0 ? (
+                                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+                                    {chamaHub.joined.map((chama: any) => (
+                                        <Card
+                                            key={chama.id}
+                                            bg={cardBg}
+                                            rounded="xl"
+                                            shadow="md"
+                                            border="1px solid"
+                                            borderColor="green.100"
+                                            _hover={{ shadow: 'xl', transform: 'translateY(-2px)', borderColor: 'green.400' }}
+                                            transition="all 0.2s"
+                                        >
+                                            <CardBody>
+                                                <Flex justify="space-between" align="start" mb={4}>
+                                                    <Icon as={FaUserFriends} color="green.500" w={8} h={8} />
+                                                    <Badge colorScheme="green" variant="solid" rounded="full" px={2}>JOINED</Badge>
+                                                </Flex>
+                                                <Heading size="md" mb={2}>{chama.name}</Heading>
+                                                <Text color="gray.500" fontSize="sm" mb={6} noOfLines={2}>
+                                                    {chama.description || "Active decentralized savings circle."}
+                                                </Text>
 
-                                    <HStack justify="space-between" fontSize="sm" mb={6} bg="gray.50" p={3} rounded="md">
-                                        <Text color="gray.500">My Share:</Text>
-                                        <Text fontWeight="bold">{formatCurrency("0.145").full}</Text>
-                                    </HStack>
+                                                <HStack justify="space-between" fontSize="sm" mb={6} bg="gray.50" p={3} rounded="md">
+                                                    <Text color="gray.500">Balance:</Text>
+                                                    <Text fontWeight="bold">{formatCurrency((chama.current_balance_sats / 100_000_000).toString()).full}</Text>
+                                                </HStack>
 
-                                    <Button
-                                        w="full"
-                                        colorScheme="orange"
-                                        onClick={() => handleEnterChama(chamaName)}
-                                        rightIcon={<FaArrowRight />}
-                                    >
-                                        Enter Chama
-                                    </Button>
-                                </CardBody>
-                            </Card>
-                        ))}
-                    </SimpleGrid>
-                )}
+                                                <Button
+                                                    w="full"
+                                                    colorScheme="purple"
+                                                    onClick={() => navigate(`/chama-dashboard/${chama.id}`)}
+                                                    rightIcon={<FaArrowRight />}
+                                                >
+                                                    Open Dashboard
+                                                </Button>
+                                            </CardBody>
+                                        </Card>
+                                    ))}
+                                </SimpleGrid>
+                            ) : (
+                                <Card variant="outline" py={10} borderStyle="dashed">
+                                    <VStack spacing={4}>
+                                        <Icon as={FaUserFriends} w={10} h={10} color="gray.300" />
+                                        <Text color="gray.500">You haven't joined any Chamas yet.</Text>
+                                        <Button size="sm" variant="link" colorScheme="purple">Browse Chamas</Button>
+                                    </VStack>
+                                </Card>
+                            )}
+                        </TabPanel>
+                        <TabPanel px={0} py={6}>
+                            {isLoadingHub ? (
+                                <Flex justify="center" py={10}><Spinner color="purple.500" /></Flex>
+                            ) : chamaHub.available.length > 0 ? (
+                                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+                                    {chamaHub.available.map((chama: any) => (
+                                        <Card
+                                            key={chama.id}
+                                            bg={cardBg}
+                                            rounded="xl"
+                                            shadow="md"
+                                            border="1px solid"
+                                            borderColor="gray.100"
+                                            _hover={{ shadow: 'xl', transform: 'translateY(-2px)' }}
+                                            transition="all 0.2s"
+                                        >
+                                            <CardBody>
+                                                <Flex justify="space-between" align="start" mb={4}>
+                                                    <Icon as={FaPiggyBank} color="purple.500" w={8} h={8} />
+                                                    <Badge colorScheme="purple" variant="outline" rounded="full" px={2}>AVAILABLE</Badge>
+                                                </Flex>
+                                                <Heading size="md" mb={2}>{chama.name}</Heading>
+                                                <Text color="gray.500" fontSize="sm" mb={4} noOfLines={2}>
+                                                    {chama.description || "Decentralized community savings."}
+                                                </Text>
+                                                
+                                                <VStack align="stretch" spacing={2} mb={6} fontSize="xs" color="gray.600">
+                                                    <Flex justify="space-between">
+                                                        <Text>Target:</Text>
+                                                        <Text fontWeight="bold">{formatCurrency((chama.target_goal_sats / 100_000_000).toString()).full}</Text>
+                                                    </Flex>
+                                                    <Flex justify="space-between">
+                                                        <Text>Contribution:</Text>
+                                                        <Text fontWeight="bold">{formatCurrency((chama.contribution_amount_sats / 100_000_000).toString()).full}</Text>
+                                                    </Flex>
+                                                </VStack>
+
+                                                <Button
+                                                    w="full"
+                                                    variant="outline"
+                                                    colorScheme="purple"
+                                                    onClick={() => navigate(`/chama-dashboard/${chama.id}`)}
+                                                >
+                                                    View Details
+                                                </Button>
+                                            </CardBody>
+                                        </Card>
+                                    ))}
+                                </SimpleGrid>
+                            ) : (
+                                <Text color="gray.500" textAlign="center">No more Chamas available to join.</Text>
+                            )}
+                        </TabPanel>
+                    </TabPanels>
+                </Tabs>
 
                 {/* Quick Actions - Context-Aware */}
                 <Heading size="md" mb={6}>Quick Actions</Heading>
@@ -287,61 +441,51 @@ const Dashboard = () => {
                     </SimpleGrid>
                 )}
 
-                {/* Learn Section */}
-                <Card
-                    as={RouterLink}
-                    to="/learn"
-                    variant="outline"
-                    _hover={{ borderColor: 'green.400', shadow: 'md', transform: 'translateY(-4px)', textDecoration: 'none' }}
-                    transition="all 0.2s"
-                    rounded="xl"
-                >
-                    <CardBody display="flex" alignItems="center" gap={4}>
-                        <Box bg="green.50" p={3} rounded="lg" color="green.600">
-                            <Icon as={FaBookOpen} w={5} h={5} />
-                        </Box>
-                        <Box>
-                            <Heading size="sm">Academy</Heading>
-                            <Text fontSize="xs" color="gray.500">Learn & Earn Badges</Text>
-                        </Box>
-                    </CardBody>
-                </Card>
+            {/* Transaction History Section */}
+            <Heading size="md" mb={6} mt={10}>Global Transaction History</Heading>
+            <Card variant="outline" rounded="xl" overflow="hidden">
+                    <Table variant="simple">
+                        <Thead bg="gray.50">
+                            <Tr>
+                                <Th>Type</Th>
+                                <Th>Reason</Th>
+                                <Th>Amount</Th>
+                                <Th>Date</Th>
+                                <Th>Status</Th>
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {transactions.length > 0 ? (
+                                transactions.map((tx: any) => (
+                                    <Tr key={tx.id}>
+                                        <Td>
+                                            <Badge colorScheme={tx.type === 'deposit' ? 'green' : 'purple'} variant="subtle">
+                                                {tx.type.toUpperCase()}
+                                            </Badge>
+                                        </Td>
+                                        <Td><Text fontSize="sm" fontWeight="medium">{tx.reason}</Text></Td>
+                                        <Td fontWeight="bold">{(tx.amount_sats / 100_000_000).toFixed(8)} BTC</Td>
+                                        <Td fontSize="xs" color="gray.500">{new Date(tx.created_at).toLocaleDateString()}</Td>
+                                        <Td>
+                                            <Badge colorScheme={tx.status === 'COMPLETED' ? 'green' : 'orange'}>
+                                                {tx.status}
+                                            </Badge>
+                                        </Td>
+                                    </Tr>
+                                ))
+                            ) : (
+                                <Tr><Td colSpan={5} textAlign="center" py={10} color="gray.400">No transactions recorded yet.</Td></Tr>
+                            )}
+                        </Tbody>
+                    </Table>
+            </Card>
 
-                <Card
-                    variant="outline"
-                    opacity={0.7}
-                    cursor="default"
-                    rounded="xl"
-                >
-                    <CardBody display="flex" alignItems="center" gap={4}>
-                        <Box bg="red.50" p={3} rounded="lg" color="red.600">
-                            <Icon as={FaChartLine} w={5} h={5} />
-                        </Box>
-                        <Box>
-                            <Heading size="sm" color="gray.600">Performance</Heading>
-                            <Text fontSize="xs" color="gray.500">Analytics Pro (Coming Soon)</Text>
-                        </Box>
-                    </CardBody>
-                </Card>
-
-                <Card
-                    variant="outline"
-                    opacity={0.7}
-                    cursor="default"
-                    rounded="xl"
-                >
-                    <CardBody display="flex" alignItems="center" gap={4}>
-                        <Box bg="gray.100" p={3} rounded="lg" color="gray.600">
-                            <Icon as={FaBell} w={5} h={5} />
-                        </Box>
-                        <Box>
-                            <Heading size="sm" color="gray.600">Reminders</Heading>
-                            <Text fontSize="xs" color="gray.500">SMS & Email Alerts</Text>
-                        </Box>
-                    </CardBody>
-                </Card>
-            </SimpleGrid>
-
+            {/* Fix 5: One-Time Tutorial component */}
+            <Tutorial 
+                isOpen={showTutorial} 
+                onClose={() => setShowTutorial(false)} 
+                onComplete={closeTutorial} 
+            />
         </Container>
         </Box >
     )

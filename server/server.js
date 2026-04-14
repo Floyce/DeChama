@@ -50,7 +50,10 @@ function saveDB() {
 
 // 1. Auth: Register
 app.post('/api/auth/register', (req, res) => {
-    const { email, phone, password, displayName } = req.body;
+    const email = req.body.email;
+    const phone = req.body.phone || req.body.phoneNumber;
+    const password = req.body.password;
+    const displayName = req.body.displayName || req.body.display_name;
 
     // Check if exists
     const existing = db.users.find(u => u.email === email || u.phone === phone);
