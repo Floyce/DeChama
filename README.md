@@ -88,4 +88,4 @@ To initialize the governance and request system:
 ## 🤝 Contribution
 Impact Chain is open-source. Join us in building the future of decentralized community finance!
 
-**Developed by Antigravity AI for Floyce.**
+**Developed with love by Floyce.**
