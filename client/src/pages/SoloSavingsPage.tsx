@@ -38,7 +38,7 @@ import {
     SimpleGrid
 } from '@chakra-ui/react'
 import { FaBitcoin, FaArrowLeft, FaArrowDown, FaArrowUp, FaHistory, FaQrcode, FaPaperPlane, FaBolt } from 'react-icons/fa'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -49,9 +49,9 @@ const SoloSavingsPage = () => {
     const toast = useToast()
 
     const [transactions] = useState([
-        { id: 1, type: 'received', amount: '0.00005 BTC', date: 'Today, 10:30 AM', status: 'Confirmed' },
-        { id: 2, type: 'sent', amount: '0.00002 BTC', date: 'Yesterday, 4:15 PM', status: 'Confirmed' },
-        { id: 3, type: 'received', amount: '0.00010 BTC', date: 'Jan 24, 2026', status: 'Confirmed' },
+        { id: 1, type: 'received', amount: '5,000 sats', date: 'Today, 10:30 AM', status: 'Confirmed' },
+        { id: 2, type: 'sent', amount: '2,000 sats', date: 'Yesterday, 4:15 PM', status: 'Confirmed' },
+        { id: 3, type: 'received', amount: '10,000 sats', date: 'Jan 24, 2026', status: 'Confirmed' },
     ])
 
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -65,7 +65,7 @@ const SoloSavingsPage = () => {
     const handleAction = (action: 'Send' | 'Receive') => {
         if (!user) {
             toast({ title: 'Please Log In', description: 'You need an account to use the wallet.', status: 'warning' })
-            navigate('/auth')
+            navigate('/')
             return
         }
         if (!isConnected) {
@@ -88,10 +88,13 @@ const SoloSavingsPage = () => {
         setProcessing(true)
         try {
             if (modalAction === 'Receive') {
-                // Fix 8: Real Invoice Generation
+                const token = localStorage.getItem('impactchain_token')
                 const res = await fetch('/api/contributions/create-invoice', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({
                         user_id: user?.id || 'guest',
                         chama_id: 'SOLO', // Handled as solo savings on backend
@@ -109,10 +112,13 @@ const SoloSavingsPage = () => {
                     toast({ title: 'Backend Error', description: err.detail, status: 'error' })
                 }
             } else {
-                // Fix 10: Real Lightning Payment (Send)
+                const token = localStorage.getItem('impactchain_token')
                 const res = await fetch('/api/payments/pay', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify({ 
                         bolt11: invoiceString,
                         reason: reason 
@@ -175,7 +181,7 @@ const SoloSavingsPage = () => {
                             <CardBody>
                                 <Stat>
                                     <StatLabel color="gray.500">Total Saved</StatLabel>
-                                    <StatNumber color="green.500">0.12 BTC</StatNumber>
+                                    <StatNumber color="green.500">12,000,000 sats</StatNumber>
                                     <StatHelpText>All time</StatHelpText>
                                 </Stat>
                             </CardBody>
@@ -184,7 +190,7 @@ const SoloSavingsPage = () => {
                             <CardBody>
                                 <Stat>
                                     <StatLabel color="gray.500">Total Spent</StatLabel>
-                                    <StatNumber color="red.500">0.075 BTC</StatNumber>
+                                    <StatNumber color="red.500">7,500,000 sats</StatNumber>
                                     <StatHelpText>All time</StatHelpText>
                                 </Stat>
                             </CardBody>

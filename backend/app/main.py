@@ -1,7 +1,7 @@
 import sys
 sys.modules['_wmi'] = None
 
-from fastapi import FastAPI, Depends, HTTPException, status, Body, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Body, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def get_auth_user_id(
+    user_id: str | None = Query(None, alias="user_id"),
+    header_user_id: str | None = Header(None, alias="user-id")
+) -> str:
+    uid = header_user_id or user_id
+    if not uid:
+        raise HTTPException(status_code=401, detail="Authentication missing: user ID not provided")
+    return uid
 
 @app.on_event("startup")
 async def startup():
@@ -98,18 +107,25 @@ async def validate_email(req: EmailValidReq):
 
 # Updated Chama logic for Impact Chain
 @app.post("/api/chamas/create", response_model=schemas.ChamaResponse)
-async def create_chama(chama: dict, db: AsyncSession = Depends(get_db)):
-    # Fix 3: Robust Chama Creation logic
-    user_id = chama.get("userId") or chama.get("creator_id")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Missing user ID")
+async def create_chama(chama: dict, user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
+    # Validate user exists
+    user_check = await db.execute(select(models.User).filter(models.User.id == user_id))
+    if not user_check.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Authenticated user not found in database")
     
-    # Convert BTC decimal to Sats int if needed
-    amount_btc = chama.get("contributionAmount") or 0
-    amount_sats = int(float(amount_btc) * 100_000_000) if isinstance(amount_btc, str) and amount_btc else chama.get("contribution_amount_sats", 1000)
+    # Handle Contribution Amount (Input is now in Sats)
+    amount_raw = chama.get("contributionAmount") or 0
+    try:
+        amount_sats = int(amount_raw)
+    except (ValueError, TypeError):
+        amount_sats = 0
     
-    goal_btc = chama.get("target_goal_btc") or 0
-    goal_sats = int(float(goal_btc) * 100_000_000) if isinstance(goal_btc, str) and goal_btc else chama.get("target_goal_sats", 0)
+    # Handle Target Goal (Input is now in Sats)
+    goal_raw = chama.get("target_goal_btc") or 0
+    try:
+        goal_sats = int(goal_raw)
+    except (ValueError, TypeError):
+        goal_sats = 0
 
     new_id = str(uuid.uuid4())
     db_chama = models.Chama(
@@ -119,14 +135,20 @@ async def create_chama(chama: dict, db: AsyncSession = Depends(get_db)):
         creator_id=user_id,
         contribution_amount_sats=amount_sats,
         target_goal_sats=goal_sats,
-        max_members=int(chama.get("expectedMembers") or 10),
+        max_members=int(chama.get("expectedMembers") or 100),
         payout_schedule=chama.get("frequency") or "Monthly",
         currency=chama.get("currency") or "BTC",
         member_count=1
     )
+    
+    # Check for duplicate name
+    existing = await db.execute(select(models.Chama).filter(models.Chama.name == db_chama.name))
+    if existing.scalar_one_or_none():
+         raise HTTPException(status_code=400, detail=f"The name '{db_chama.name}' is already taken. Please choose another.")
+
     db.add(db_chama)
     
-    # Auto-add creator as Admin (Fix 3: Immediate membership)
+    # Auto-add creator as Admin
     membership = models.ChamaMembership(
         user_id=user_id,
         chama_id=new_id,
@@ -141,11 +163,13 @@ async def create_chama(chama: dict, db: AsyncSession = Depends(get_db)):
         return db_chama
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=f"Error creating chama: {str(e)}")
+        # Log the full error to terminal for debugging
+        print(f"CRITICAL ERROR IN CREATE_CHAMA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Database error: {str(e)}")
 
 # Fix 6: Real Asset Statistics Endpoint
 @app.get("/api/user/stats")
-async def get_user_stats(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def get_user_stats(user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
     # Total Contribution across all chamas
     contribution_result = await db.execute(
         select(func.sum(models.Contribution.amount_sats))
@@ -168,28 +192,88 @@ async def get_user_stats(user_id: str = Query(...), db: AsyncSession = Depends(g
         "payouts_received_sats": 0 # Placeholder for now
     }
 
+class LightningAddressUpdate(BaseModel):
+    user_id: str
+    lightning_address: str
+
+@app.post("/api/user/lightning-address")
+async def update_lightning_address(req: LightningAddressUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.User).filter(models.User.id == req.user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.lightning_address = req.lightning_address
+    await db.commit()
+    return {"success": True, "message": "Lightning address saved"}
+
 @app.get("/api/chamas/hub")
-async def get_chama_hub(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
-    # Joined Chamas
-    joined_result = await db.execute(
+async def get_chama_hub(user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
+    # ACTIVE Memberships
+    joined_res = await db.execute(
         select(models.Chama)
         .join(models.ChamaMembership)
-        .filter(models.ChamaMembership.user_id == user_id)
+        .filter(models.ChamaMembership.user_id == user_id, models.ChamaMembership.status == models.MembershipStatus.ACTIVE)
     )
-    joined = joined_result.scalars().all()
+    joined = joined_res.scalars().all()
     
-    # Available Chamas (Not joined)
-    joined_ids = [c.id for c in joined]
-    available_result = await db.execute(
-        select(models.Chama).filter(models.Chama.id.notin_(joined_ids)) if joined_ids else select(models.Chama)
+    # PENDING Memberships with Vote stats
+    pending_res = await db.execute(
+        select(models.Chama)
+        .join(models.ChamaMembership)
+        .filter(models.ChamaMembership.user_id == user_id, models.ChamaMembership.status == models.MembershipStatus.PENDING)
     )
-    available = available_result.scalars().all()
+    db_pending = pending_res.scalars().all()
+    
+    pending = []
+    for c in db_pending:
+        # Finding the join request for this user and this chama
+        req_res = await db.execute(
+            select(models.ChamaRequest)
+            .filter(models.ChamaRequest.chama_id == c.id, models.ChamaRequest.user_id == user_id, models.ChamaRequest.type == 'join')
+        )
+        chama_req = req_res.scalar_one_or_none()
+        
+        # Total members to calculate 51%
+        mem_count_res = await db.execute(select(func.count(models.ChamaMembership.user_id)).filter(models.ChamaMembership.chama_id == c.id, models.ChamaMembership.status == models.MembershipStatus.ACTIVE))
+        total_m = mem_count_res.scalar() or 1
+        
+        approvals = 0
+        if chama_req:
+            votes_res = await db.execute(select(func.count(models.ChamaRequestVote.id)).filter(models.ChamaRequestVote.request_id == chama_req.id, models.ChamaRequestVote.vote == True))
+            approvals = votes_res.scalar() or 0
+            
+        pending.append({
+            "id": c.id,
+            "name": c.name,
+            "description": c.description,
+            "approvals": approvals,
+            "total_members": total_m,
+            "target_votes": int(total_m * 0.51) + 1
+        })
+
+    # IDs to exclude
+    all_membership_res = await db.execute(
+        select(models.ChamaMembership.chama_id).filter(models.ChamaMembership.user_id == user_id)
+    )
+    membership_ids = [row[0] for row in all_membership_res.all()]
+    
+    # Available Chamas (No membership record)
+    available_res = await db.execute(
+        select(models.Chama).filter(models.Chama.id.notin_(membership_ids)) if membership_ids else select(models.Chama)
+    )
+    available = available_res.scalars().all()
     
     return {
         "joined": joined,
+        "pending": pending,
         "available": available
     }
 
+@app.get("/api/chamas/discover")
+async def discover_chamas(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.Chama))
+    return result.scalars().all()
 # Fix 10: Actual Lightning Payment (Outgoing)
 class PaymentRequest(BaseModel):
     bolt11: str
@@ -208,7 +292,7 @@ async def pay_lightning_invoice(req: PaymentRequest, db: AsyncSession = Depends(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/user/chamas", response_model=list[schemas.ChamaResponse])
-async def get_user_chamas(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def get_user_chamas(user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(models.Chama)
         .join(models.ChamaMembership)
@@ -228,7 +312,7 @@ async def get_chama(chama_id: str, db: AsyncSession = Depends(get_db)):
     return chama
 
 @app.get("/api/chamas/{chama_id}/my-membership")
-async def get_my_membership(chama_id: str, user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def get_my_membership(chama_id: str, user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(models.ChamaMembership).filter(
             models.ChamaMembership.chama_id == chama_id,
@@ -317,23 +401,79 @@ async def create_invoice(req: schemas.InvoiceCreate, db: AsyncSession = Depends(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/chamas/{chama_id}/dashboard")
-async def get_chama_dashboard(chama_id: str, db: AsyncSession = Depends(get_db)):
+async def get_chama_dashboard(chama_id: str, user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
+    # STRICT ACCESS CONTROL
+    membership_res = await db.execute(select(models.ChamaMembership).filter(
+        models.ChamaMembership.chama_id == chama_id,
+        models.ChamaMembership.user_id == user_id,
+        models.ChamaMembership.status == models.MembershipStatus.ACTIVE
+    ))
+    membership = membership_res.scalar_one_or_none()
+    if not membership:
+        raise HTTPException(status_code=403, detail="Access Denied: You must be an approved member of this Chama.")
+
     result = await db.execute(select(models.Chama).filter(models.Chama.id == chama_id))
     chama = result.scalar_one_or_none()
     if not chama: raise HTTPException(404, "Chama not found")
     
-    # Rotation logic: join dates
+    # Get last payout date to define current cycle range
+    last_payout_res = await db.execute(
+        select(models.Payout.executed_at)
+        .filter(models.Payout.chama_id == chama_id)
+        .order_by(models.Payout.executed_at.desc())
+        .limit(1)
+    )
+    last_payout_date = last_payout_res.scalar() or datetime.datetime(2020, 1, 1)
+
+    # Rotation logic & Detailed member contribution stats
     members_result = await db.execute(
-        select(models.User.displayName, models.ChamaMembership.joined_at)
+        select(models.User.id, models.User.displayName, models.ChamaMembership.joined_at)
         .join(models.User, models.ChamaMembership.user_id == models.User.id)
         .filter(models.ChamaMembership.chama_id == chama_id, models.ChamaMembership.status == models.MembershipStatus.ACTIVE)
         .order_by(models.ChamaMembership.joined_at.asc())
     )
-    members = [{"name": m[0], "joined_at": m[1]} for m in members_result.all()]
     
-    # Calculate who receives next
-    # For MVP: cycle based on current_balance vs contribution_amount
-    payout_count = 0 # In real app, check Payouts table
+    members = []
+    for row in members_result.all():
+        u_id, u_name, u_joined = row
+        
+        # SUM Contributions since last payout
+        contrib_res = await db.execute(
+            select(func.sum(models.Contribution.amount_sats))
+            .filter(
+                models.Contribution.user_id == u_id,
+                models.Contribution.chama_id == chama_id,
+                models.Contribution.status == models.TransactionStatus.COMPLETED,
+                models.Contribution.timestamp >= last_payout_date
+            )
+        )
+        paid = contrib_res.scalar() or 0
+        
+        # SUM internal transfers to this chama
+        transfers_res = await db.execute(
+            select(func.sum(models.Transaction.amount_sats))
+            .filter(
+                models.Transaction.user_id == u_id,
+                models.Transaction.chama_id == chama_id,
+                models.Transaction.type == 'transfer',
+                models.Transaction.created_at >= last_payout_date
+            )
+        )
+        transferred = transfers_res.scalar() or 0
+        
+        total_member_paid = paid + transferred
+        
+        members.append({
+            "id": u_id,
+            "name": u_name, 
+            "joined_at": u_joined,
+            "paid_sats": total_member_paid,
+            "is_paid": total_member_paid >= chama.contribution_amount_sats
+        })
+    
+    # Calculate payout info
+    payouts_count_res = await db.execute(select(func.count(models.Payout.id)).filter(models.Payout.chama_id == chama_id))
+    payout_count = payouts_count_res.scalar() or 0
     next_receiver = members[payout_count % len(members)]["name"] if members else "N/A"
     
     return {
@@ -373,7 +513,7 @@ async def transfer_to_chama(req: dict, db: AsyncSession = Depends(get_db)):
     return {"success": True, "new_balance": chama.current_balance_sats}
 
 @app.get("/api/transactions")
-async def list_transactions(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def list_transactions(user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(models.Transaction)
         .filter(models.Transaction.user_id == user_id)
@@ -406,7 +546,47 @@ async def check_contribution_payment(payment_hash: str, db: AsyncSession = Depen
             chama = await db.get(models.Chama, contribution.chama_id)
             if chama:
                 chama.current_balance_sats += contribution.amount_sats
-            
+                
+                # CHECK FOR PAYOUT (Rotation Logic)
+                # If pool is full, pay the next person
+                members_res = await db.execute(
+                    select(models.User)
+                    .join(models.ChamaMembership)
+                    .filter(models.ChamaMembership.chama_id == chama.id, models.ChamaMembership.status == models.MembershipStatus.ACTIVE)
+                    .order_by(models.ChamaMembership.joined_at.asc())
+                )
+                active_members = members_res.scalars().all()
+                
+                required_total = chama.contribution_amount_sats * len(active_members)
+                if chama.current_balance_sats >= required_total and required_total > 0:
+                    # Determine next receiver
+                    # Check payout history
+                    payouts_res = await db.execute(select(func.count(models.Payout.id)).filter(models.Payout.chama_id == chama.id))
+                    payout_count = payouts_res.scalar() or 0
+                    
+                    receiver = active_members[payout_count % len(active_members)]
+                    
+                    if receiver.lightning_address:
+                        print(f"AUTOMATIC PAYOUT: Paying {chama.current_balance_sats} sats to {receiver.lightning_address} (Member: {receiver.displayName})")
+                        try:
+                            # In real app: call lnbits.pay_invoice() or use a LN address provider
+                            # For MVP: Log and clear balance
+                            payout = models.Payout(
+                                id=str(uuid.uuid4()),
+                                chama_id=chama.id,
+                                recipient_id=receiver.id,
+                                amount_sats=chama.current_balance_sats,
+                                memo=f"Impact Chain Payout: {chama.name}",
+                                status=models.TransactionStatus.COMPLETED,
+                                executed_at=datetime.utcnow()
+                            )
+                            db.add(payout)
+                            chama.current_balance_sats = 0 # Reset balance after payout rotation
+                        except Exception as e:
+                            print(f"Payout Failed: {e}")
+                    else:
+                        print(f"PAYOUT BLOCKED: {receiver.displayName} has no lightning address saved!")
+
             # Log as Transaction also
             tx = models.Transaction(
                 id=str(uuid.uuid4()),
@@ -424,3 +604,133 @@ async def check_contribution_payment(payment_hash: str, db: AsyncSession = Depen
             return {"status": "paid", "message": "Contribution confirmed!"}
     
     return {"status": "pending", "message": "Still waiting for payment..."}
+
+# ── REQUESTS & GOVERNANCE ────────────────────────────────────────────────────────
+@app.post("/api/chamas/{chama_id}/requests", response_model=schemas.ChamaRequestResponse)
+async def create_request(chama_id: str, req: schemas.ChamaRequestCreate, user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
+    # MEMBERSHIP CHECK: ONLY ACTIVE MEMBERS CAN CREATE DYNAMIC REQUESTS
+    if req.type != 'join':
+        membership_res = await db.execute(select(models.ChamaMembership).filter(
+            models.ChamaMembership.chama_id == chama_id,
+            models.ChamaMembership.user_id == user_id,
+            models.ChamaMembership.status == models.MembershipStatus.ACTIVE
+        ))
+        if not membership_res.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Permission Denied: Only active members can create requests.")
+
+    req_id = str(uuid.uuid4())
+    db_req = models.ChamaRequest(
+        id=req_id,
+        chama_id=chama_id,
+        user_id=user_id,
+        type=req.type,
+        amount_sats=req.amount_sats,
+        title=req.title,
+        description=req.description,
+        status=models.RequestStatus.PENDING
+    )
+    db.add(db_req)
+    await db.commit()
+    await db.refresh(db_req)
+    return db_req
+
+@app.get("/api/chamas/{chama_id}/requests")
+async def get_chama_requests(chama_id: str, db: AsyncSession = Depends(get_db)):
+    # Return requests along with vote counts
+    result = await db.execute(
+        select(models.ChamaRequest, models.User.displayName)
+        .join(models.User, models.ChamaRequest.user_id == models.User.id)
+        .filter(models.ChamaRequest.chama_id == chama_id)
+        .order_by(models.ChamaRequest.created_at.desc())
+    )
+    reqs = result.all()
+
+    out = []
+    for r, display_name in reqs:
+        # Get votes
+        votes_res = await db.execute(select(models.ChamaRequestVote).filter(models.ChamaRequestVote.request_id == r.id))
+        votes = votes_res.scalars().all()
+        approvals = sum(1 for v in votes if v.vote)
+        rejections = sum(1 for v in votes if not v.vote)
+        out.append({
+            "id": r.id,
+            "type": r.type,
+            "user_id": r.user_id,
+            "user_name": display_name,
+            "amount_sats": r.amount_sats,
+            "title": r.title,
+            "description": r.description,
+            "status": r.status,
+            "created_at": r.created_at,
+            "approvals": approvals,
+            "rejections": rejections,
+            "total_votes": len(votes)
+        })
+    return out
+
+@app.post("/api/chamas/requests/{request_id}/vote")
+async def vote_on_request(request_id: str, vote: bool = Body(..., embed=True), user_id: str = Depends(get_auth_user_id), db: AsyncSession = Depends(get_db)):
+    # Check if request exists
+    req_res = await db.execute(select(models.ChamaRequest).filter(models.ChamaRequest.id == request_id))
+    chama_req = req_res.scalar_one_or_none()
+    if not chama_req:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # Check existing vote
+    vote_res = await db.execute(select(models.ChamaRequestVote).filter(
+        models.ChamaRequestVote.request_id == request_id,
+        models.ChamaRequestVote.user_id == user_id
+    ))
+    if vote_res.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="User has already voted on this request")
+
+    new_vote = models.ChamaRequestVote(
+        id=str(uuid.uuid4()),
+        request_id=request_id,
+        user_id=user_id,
+        vote=vote
+    )
+    db.add(new_vote)
+
+    # Calculate if threshold met
+    # Assume 51% of members needed
+    members_res = await db.execute(select(func.count(models.ChamaMembership.user_id)).filter(
+        models.ChamaMembership.chama_id == chama_req.chama_id,
+        models.ChamaMembership.status == models.MembershipStatus.ACTIVE
+    ))
+    total_members = members_res.scalar() or 1
+    
+    votes_res = await db.execute(select(models.ChamaRequestVote).filter(models.ChamaRequestVote.request_id == request_id))
+    all_votes = votes_res.scalars().all()
+    approvals = sum(1 for v in all_votes if v.vote) + (1 if vote else 0)
+    
+    if approvals / total_members > 0.5:
+        chama_req.status = models.RequestStatus.APPROVED
+        # Auto-create membership if join request
+        if chama_req.type == 'join': # Using string literal for safety
+            existing_mem = await db.execute(select(models.ChamaMembership).filter(
+                models.ChamaMembership.chama_id == chama_req.chama_id,
+                models.ChamaMembership.user_id == chama_req.user_id
+            ))
+            m = existing_mem.scalar_one_or_none()
+            if m:
+                m.status = models.MembershipStatus.ACTIVE
+            else:
+                db.add(models.ChamaMembership(
+                    user_id=chama_req.user_id, 
+                    chama_id=chama_req.chama_id, 
+                    status=models.MembershipStatus.ACTIVE,
+                    role=models.MemberRole.MEMBER
+                ))
+
+    await db.commit()
+    return {"success": True, "status": chama_req.status}
+
+# ── INVITES & EMAILS ──────────────────────────────────────────────────────────
+@app.post("/api/invite")
+async def send_invite(email: str = Body(..., embed=True), chama_id: str = Body(None, embed=True), db: AsyncSession = Depends(get_db)):
+    # Mock Resend API call
+    print(f"[RESEND/EMAILJS MOCK] Sending invite to {email} for Chama {chama_id}")
+    print(f"[RESEND/EMAILJS MOCK] Subject: You've been invited to Impact Chain!")
+    print(f"[RESEND/EMAILJS MOCK] Body: Click here to join: http://localhost:5173/signup?chama={chama_id}")
+    return {"success": True, "message": f"Invite sent successfully to {email}"}

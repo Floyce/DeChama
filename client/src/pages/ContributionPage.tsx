@@ -25,7 +25,7 @@ import { useNavigate, Link as RouterLink } from 'react-router-dom'
 import { FormControl, FormLabel, Input, AlertTitle, AlertDescription } from '@chakra-ui/react'
 
 const ContributionPage = () => {
-    const { isConnected, connectWallet, formatCurrency } = useWallet()
+    const { isConnected, connectWallet, formatCurrency, activeChama } = useWallet()
     const navigate = useNavigate()
     const toast = useToast()
 
@@ -49,10 +49,14 @@ const ContributionPage = () => {
         const user = JSON.parse(savedUser)
         
         setLoading(true)
+        const token = localStorage.getItem('impactchain_token')
         try {
             const res = await fetch('/api/contributions/create-invoice', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     user_id: user.id,
                     chama_id: activeChama,
@@ -76,8 +80,11 @@ const ContributionPage = () => {
 
     const startPolling = (paymentHash: string) => {
         const interval = setInterval(async () => {
+            const token = localStorage.getItem('impactchain_token')
             try {
-                const res = await fetch(`/api/contributions/check-payment/${paymentHash}`)
+                const res = await fetch(`/api/contributions/check-payment/${paymentHash}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                 const data = await res.json()
                 if (data.status === 'paid') {
                     clearInterval(interval)
@@ -112,7 +119,7 @@ const ContributionPage = () => {
                 <Icon as={FaBitcoin} w={16} h={16} color="purple.500" mb={6} />
                 <Heading mb={4}>Connect Wallet</Heading>
                 <Text mb={6} color="gray.600">You must connect your Lightning wallet (Leather, Xverse) to make a secure contribution.</Text>
-                <Button colorScheme="purple" size="lg" onClick={connectWallet}>Connect Wallet</Button>
+                <Button colorScheme="purple" size="lg" onClick={() => toast({ title: 'Connection setup', description: 'Please use the Connect button in the top navigation bar', status: 'info' })}>Connect Wallet</Button>
             </Container>
         )
     }

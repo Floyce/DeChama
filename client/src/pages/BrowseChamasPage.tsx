@@ -19,7 +19,7 @@ import {
     VStack,
     useToast
 } from '@chakra-ui/react'
-import { FaUsers, FaArrowLeft, FaFilter, FaSearch, FaLeaf, FaBuilding, FaHome, FaHandHoldingUsd, FaCheckCircle, FaClock, FaPlus } from 'react-icons/fa'
+import { FaUsers, FaArrowLeft, FaFilter, FaSearch, FaLeaf, FaBuilding, FaHome, FaHandHoldingUsd, FaCheckCircle, FaClock, FaPlus, FaHandshake } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
 import { useWallet } from '../context/WalletContext'
 import { useAuth } from '../context/AuthContext'
@@ -36,8 +36,11 @@ const BrowseChamasPage = () => {
 
     useEffect(() => {
         const fetchDiscover = async () => {
+            const token = localStorage.getItem('impactchain_token')
             try {
-                const res = await fetch('/api/chamas/discover')
+                const res = await fetch('/api/chamas/discover', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                 const data = await res.json()
                 if (Array.isArray(data)) {
                     setChamas(data)
@@ -55,14 +58,23 @@ const BrowseChamasPage = () => {
         if (!user) return
 
         try {
-            const res = await fetch(`/api/chamas/${chamaId}/join-request`, {
+            const token = localStorage.getItem('impactchain_token')
+            const res = await fetch(`/api/chamas/${chamaId}/requests`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'user-id': user.id
+                },
+                body: JSON.stringify({ 
+                    type: 'join',
+                    title: `Join Request: ${user.displayName || user.phoneNumber}`,
+                    description: `${user.displayName || user.phoneNumber} would like to join ${chamaName}.`
+                })
             })
             const data = await res.json()
 
-            if (data.success) {
+            if (res.ok) {
                 setPendingChamas(prev => [...prev, chamaName])
                 toast({
                     title: 'Request Sent',

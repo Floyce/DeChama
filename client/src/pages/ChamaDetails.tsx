@@ -199,8 +199,8 @@ const ChamaDetails = () => {
     ]
 
     const activities = [
-        { title: 'Contribution Received', date: '2 hrs ago', desc: 'Alice contributed 0.01 BTC via Lightning' },
-        { title: 'Proposal Approved', date: '1 day ago', desc: 'Loan for Bob (0.1 BTC) approved by 6 members' },
+        { title: 'Contribution Received', date: '2 hrs ago', desc: 'Alice contributed 1,000,000 sats via Lightning' },
+        { title: 'Proposal Approved', date: '1 day ago', desc: 'Loan for Bob (10,000,000 sats) approved by 6 members' },
         { title: 'New Member', date: '3 days ago', desc: 'Charlie joined the Chama' },
     ]
 
@@ -251,7 +251,7 @@ const ChamaDetails = () => {
                     <Box mb={6}>
                         <PaydayCelebration
                             userName={user?.displayName || 'Friend'}
-                            amount="45,000 KES (0.0015 BTC)"
+                            amount="45,000 kshs (150,000 sats)"
                             onClose={() => setShowPaydayCelebration(false)}
                         />
                     </Box>
@@ -262,7 +262,7 @@ const ChamaDetails = () => {
                     <PayoutCountdown
                         nextPayoutDate={nextPayoutDate}
                         nextRecipient={user?.displayName || 'You'}
-                        payoutAmount="45,000 KES (0.0015 BTC)"
+                        payoutAmount="45,000 kshs (150,000 sats)"
                         isCurrentUser={true}
                     />
                     <PayoutQueue members={payoutQueueMembers} />

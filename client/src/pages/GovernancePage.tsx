@@ -39,9 +39,10 @@ interface Proposal {
     description: string
     votes_for: number
     votes_against: number
-    status: 'active' | 'passed' | 'rejected' | 'executed'
+    status: string
     deadline: string
-    myVote?: boolean
+    myVote?: string
+    amount?: string
 }
 
 const GovernancePage = () => {
@@ -59,22 +60,29 @@ const GovernancePage = () => {
     // Fetch Proposals & Pending members
     const fetchData = async () => {
         if (!activeChama) return
+        const token = localStorage.getItem('impactchain_token')
         setIsLoading(true)
         try {
             // Proposals
-            const pRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}/proposals`)
+            const pRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}/proposals`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
             const pData = await pRes.json()
             if (Array.isArray(pData)) setProposals(pData)
 
             // Pending Members (if admin)
             if (currentUserRole === 'admin') {
-                const mRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}/pending-members`)
+                const mRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}/pending-members`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                 const mData = await mRes.json()
                 if (Array.isArray(mData)) setPendingMembers(mData)
             }
 
             // Get Chama Details for total members count
-            const cRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}`)
+            const cRes = await fetch(`/api/chamas/${encodeURIComponent(activeChama)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
             const cData = await cRes.json()
             if (cData.expected_members) setTotalMembers(cData.expected_members)
 
@@ -91,10 +99,14 @@ const GovernancePage = () => {
 
     const handleApprove = async (userId: string) => {
         setIsApproving(userId)
+        const token = localStorage.getItem('impactchain_token')
         try {
             const res = await fetch(`/api/chamas/${encodeURIComponent(activeChama!)}/approve-member`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ user_id: userId })
             })
             const data = await res.json()
@@ -121,10 +133,14 @@ const GovernancePage = () => {
             return
         }
 
+        const token = localStorage.getItem('impactchain_token')
         try {
             const res = await fetch('/api/governance/proposals/create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     chama_id: activeChama,
                     creator_id: user.id,
@@ -153,10 +169,14 @@ const GovernancePage = () => {
             return
         }
 
+        const token = localStorage.getItem('impactchain_token')
         try {
             const res = await fetch('/api/governance/vote', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     proposal_id: id,
                     voter_id: user.id,
@@ -245,21 +265,21 @@ const GovernancePage = () => {
                                         {/* Progress Bar */}
                                         <Box mt={4}>
                                             <Flex justify="space-between" fontSize="xs" mb={1}>
-                                                <Text color="green.600" fontWeight="bold">Yes: {prop.votesFor}</Text>
-                                                <Text color="red.600" fontWeight="bold">No: {prop.votesAgainst}</Text>
+                                                <Text color="green.600" fontWeight="bold">Yes: {prop.votes_for}</Text>
+                                                <Text color="red.600" fontWeight="bold">No: {prop.votes_against}</Text>
                                             </Flex>
-                                            <Progress value={(prop.votesFor / prop.totalMembers) * 100} colorScheme={prop.status === 'Passed' ? 'green' : 'purple'} size="sm" rounded="full" bg="gray.100" />
-                                            <Text fontSize="xs" color="gray.400" mt={1}>{prop.votesFor + prop.votesAgainst} / {prop.totalMembers} voted (Threshold: 51%)</Text>
+                                            <Progress value={(prop.votes_for / totalMembers) * 100} colorScheme={prop.status === 'Passed' ? 'green' : 'purple'} size="sm" rounded="full" bg="gray.100" />
+                                            <Text fontSize="xs" color="gray.400" mt={1}>{prop.votes_for + prop.votes_against} / {totalMembers} voted (Threshold: 51%)</Text>
                                         </Box>
                                     </Box>
 
                                     {prop.status === 'Active' && !prop.myVote && (
                                         <Flex direction={{ base: 'column' }} gap={3} minW="200px">
                                             <VStack align="stretch" spacing={2}>
-                                                <Button leftIcon={<FaCheckCircle />} colorScheme="green" variant="solid" onClick={() => handleVote(prop.id, 'YES')}>
+                                                <Button leftIcon={<FaCheckCircle />} colorScheme="green" variant="solid" onClick={() => handleVote(prop.id, true)}>
                                                     Approve
                                                 </Button>
-                                                <Button leftIcon={<FaTimesCircle />} colorScheme="red" variant="outline" onClick={() => handleVote(prop.id, 'NO')}>
+                                                <Button leftIcon={<FaTimesCircle />} colorScheme="red" variant="outline" onClick={() => handleVote(prop.id, false)}>
                                                     Reject
                                                 </Button>
                                             </VStack>
@@ -268,7 +288,7 @@ const GovernancePage = () => {
                                                     Rule: 51% Consensus
                                                 </Text>
                                                 <Text fontSize="xs" color="gray.500">
-                                                    {Math.ceil(prop.totalMembers * 0.51)} of {prop.totalMembers} votes needed to pass.
+                                                    {Math.ceil(totalMembers * 0.51)} of {totalMembers} votes needed to pass.
                                                 </Text>
                                             </Box>
                                         </Flex>
@@ -311,7 +331,7 @@ const GovernancePage = () => {
                                 </FormControl>
                                 {newType === 'Loan' && (
                                     <FormControl>
-                                        <FormLabel>Amount (BTC)</FormLabel>
+                                        <FormLabel>Amount (sats)</FormLabel>
                                         <Input placeholder="0.00" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} />
                                     </FormControl>
                                 )}

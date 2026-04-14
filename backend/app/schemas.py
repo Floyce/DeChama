@@ -115,3 +115,23 @@ class NotificationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# ── REQUESTS ──────────────────────────────────────────────────────────────────
+class ChamaRequestBase(BaseModel):
+    type: str
+    amount_sats: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+class ChamaRequestCreate(ChamaRequestBase):
+    pass
+
+class ChamaRequestResponse(ChamaRequestBase):
+    id: str
+    chama_id: str
+    user_id: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, JSON, BigInteger, Enum
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, JSON, BigInteger, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import datetime
@@ -19,6 +19,17 @@ class TransactionStatus(str, enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class RequestType(str, enum.Enum):
+    JOIN = "join"
+    LOAN = "loan"
+    WITHDRAWAL = "withdrawal"
+    OTHER = "other"
+
+class RequestStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
 class User(Base):
 
     __tablename__ = "users"
@@ -30,6 +41,7 @@ class User(Base):
     displayName = Column(String)
     country_code = Column(String)
     wallet_address = Column(String)
+    lightning_address = Column(String)
     referralCode = Column(String)
     referredBy = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -160,3 +172,34 @@ class Notification(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="notifications")
+
+class ChamaRequest(Base):
+    __tablename__ = "chama_requests"
+
+    id = Column(String, primary_key=True, index=True)
+    chama_id = Column(String, ForeignKey("chamas.id"), index=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    type = Column(Enum(RequestType), nullable=False)
+    amount_sats = Column(BigInteger, nullable=True)
+    title = Column(String, nullable=True)
+    description = Column(String, nullable=True)
+    status = Column(Enum(RequestStatus), default=RequestStatus.PENDING)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    chama = relationship("Chama")
+    user = relationship("User")
+    votes = relationship("ChamaRequestVote", back_populates="chama_request", cascade="all, delete-orphan")
+
+class ChamaRequestVote(Base):
+    __tablename__ = "chama_request_votes"
+
+    id = Column(String, primary_key=True, index=True)
+    request_id = Column(String, ForeignKey("chama_requests.id"), index=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    vote = Column(Boolean, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (UniqueConstraint('request_id', 'user_id', name='uq_request_user_vote'),)
+
+    chama_request = relationship("ChamaRequest", back_populates="votes")
+    user = relationship("User")

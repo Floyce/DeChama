@@ -58,12 +58,36 @@ const CreateChamaPage = () => {
     // Protect Route - Must be logged in via Email
     useEffect(() => {
         if (!isAuthenticated) {
-            navigate('/auth')
+            navigate('/')
         }
     }, [isAuthenticated, navigate])
 
     const [activeStep, setActiveStep] = useState(0)
     const [isDeploying, setIsDeploying] = useState(false)
+    const [btcPrice, setBtcPrice] = useState<number | null>(null)
+
+    // Fetch sats/kshs rate
+    useEffect(() => {
+        const fetchRate = async () => {
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=kes')
+                const data = await res.json()
+                if (data.bitcoin && data.bitcoin.kes) {
+                    setBtcPrice(data.bitcoin.kes)
+                }
+            } catch (err) {
+                console.error("Failed to fetch BTC rate", err)
+            }
+        }
+        fetchRate()
+    }, [])
+
+    const formatKES = (sats: string) => {
+        const s = parseInt(sats) || 0
+        if (!btcPrice) return '--- kshs'
+        const kes = (s / 100_000_000) * btcPrice
+        return kes.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kshs'
+    }
 
     // Form State
     const [formData, setFormData] = useState({
@@ -138,19 +162,15 @@ const CreateChamaPage = () => {
     const handleDeploy = async () => {
         // Auth check (must have user)
         const userStr = localStorage.getItem('impactchain_user')
+        const token = localStorage.getItem('impactchain_token')
         if (!userStr) return
 
         const user = JSON.parse(userStr)
 
         // Step 6: Connect Wallet logic
         if (!isConnected) {
-            try {
-                await connectWallet()
-                toast({ title: 'Wallet Connected', status: 'success' })
-            } catch (err) {
-                toast({ title: 'Wallet connection needed to deploy', status: 'error' })
-                return
-            }
+            toast({ title: 'Wallet connection needed', description: 'Please connect your Lightning address via the top navigation bar first.', status: 'error' })
+            return
         }
 
         setIsDeploying(true)
@@ -159,15 +179,16 @@ const CreateChamaPage = () => {
             // BACKEND CALL
             const res = await fetch('/api/chamas/create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...formData,
-                    creator_id: user.id
-                })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'user-id': user.id
+                },
+                body: JSON.stringify(formData)
             })
             const data = await res.json()
 
-            if (data.success) {
+            if (res.ok) {
                 // Update Context
                 setMyChamas(prev => [...prev, formData.name])
                 setActiveChama(formData.name)
@@ -181,11 +202,17 @@ const CreateChamaPage = () => {
                 })
                 navigate('/dashboard')
             } else {
-                toast({ title: 'Error creating Chama', description: data.error, status: 'error' })
+                toast({ 
+                    title: 'Creation Failed', 
+                    description: data.detail || 'An unexpected error occurred.', 
+                    status: 'error',
+                    duration: 6000,
+                    isClosable: true
+                })
             }
 
         } catch (error) {
-            toast({ title: 'Creation Failed', status: 'error' })
+            toast({ title: 'Network Error', description: 'Could not connect to the server.', status: 'error' })
         } finally {
             setIsDeploying(false)
         }
@@ -257,7 +284,7 @@ const CreateChamaPage = () => {
                         </Flex>
                         {formData.enableReferrals && (
                             <FormControl>
-                                <FormLabel>Referral Bonus (BTC)</FormLabel>
+                                <FormLabel>Referral Bonus (sats)</FormLabel>
                                 <Input value={formData.referralBonus} onChange={(e) => updateField('referralBonus', e.target.value)} placeholder="0.0001" />
                             </FormControl>
                         )}
@@ -267,12 +294,18 @@ const CreateChamaPage = () => {
                 return (
                     <VStack spacing={4} align="stretch">
                         <FormControl isRequired>
-                            <FormLabel>Contribution Amount (BTC)</FormLabel>
-                            <Input value={formData.contributionAmount} onChange={(e) => updateField('contributionAmount', e.target.value)} placeholder="0.005" />
+                            <FormLabel>Contribution Amount (Sats)</FormLabel>
+                            <Input value={formData.contributionAmount} onChange={(e) => updateField('contributionAmount', e.target.value)} placeholder="500000" />
+                            <Text fontSize="xs" color="green.600" mt={1}>
+                                ≈ {formatKES(formData.contributionAmount)}
+                            </Text>
                         </FormControl>
                         <FormControl isRequired>
-                            <FormLabel>Target Savings Goal (BTC)</FormLabel>
-                            <Input value={formData.target_goal_btc} onChange={(e) => updateField('target_goal_btc', e.target.value)} placeholder="0.5" />
+                            <FormLabel>Target Savings Goal (Sats)</FormLabel>
+                            <Input value={formData.target_goal_btc} onChange={(e) => updateField('target_goal_btc', e.target.value)} placeholder="50000000" />
+                            <Text fontSize="xs" color="green.600" mt={1}>
+                                ≈ {formatKES(formData.target_goal_btc)}
+                            </Text>
                         </FormControl>
                         <FormControl>
                             <FormLabel>Frequency</FormLabel>
@@ -302,7 +335,7 @@ const CreateChamaPage = () => {
                         {formData.allowLoans && (
                             <>
                                 <FormControl>
-                                    <FormLabel>Max Loan Amount (BTC)</FormLabel>
+                                    <FormLabel>Max Loan Amount (sats)</FormLabel>
                                     <Input value={formData.maxLoanAmount} onChange={(e) => updateField('maxLoanAmount', e.target.value)} />
                                 </FormControl>
                                 <FormControl>
@@ -355,17 +388,17 @@ const CreateChamaPage = () => {
                             <AlertIcon />
                             Review your settings. Deployment will require a small Bitcoin network fee.
                         </Alert>
-                        <Box p={4} bg="gray.50" rounded="md" fontSize="sm">
+                        <Box p={4} bg="gray.100" rounded="md" fontSize="sm" color="gray.800">
                             <Text><b>Name:</b> {formData.name}</Text>
                             <Text><b>Type:</b> {formData.type} ({formData.privacy})</Text>
                             <Text><b>Members:</b> ~{formData.expectedMembers} (Referrals: {formData.enableReferrals ? 'Yes' : 'No'})</Text>
-                            <Text><b>Contributions:</b> {formData.contributionAmount} BTC / {formData.frequency}</Text>
+                            <Text><b>Contributions:</b> {formData.contributionAmount} Sats / {formData.frequency}</Text>
                             <Text><b>Loans:</b> {formData.allowLoans ? `${formData.interestRate}% Interest` : 'Disabled'}</Text>
                             <Text><b>Governance:</b> {formData.votingThreshold} Threshold</Text>
                         </Box>
 
                         {!isConnected ? (
-                            <Button onClick={connectWallet} colorScheme="orange" size="lg" rounded="full" leftIcon={<FaWallet />}>
+                            <Button onClick={() => toast({ title: 'Connection needed', description: 'Please connect using the top navigation bar', status: 'info' })} colorScheme="orange" size="lg" rounded="full" leftIcon={<FaWallet />}>
                                 Connect Wallet to Deploy
                             </Button>
                         ) : (

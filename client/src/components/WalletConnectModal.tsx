@@ -45,28 +45,8 @@ const WalletConnectModal = ({ isOpen, onClose, onConnect }: WalletConnectModalPr
                 <ModalCloseButton />
                 <ModalBody pb={6}>
                     <VStack spacing={4}>
-                        <Button 
-                            w="full" 
-                            size="lg" 
-                            leftIcon={<FaBolt color="#FFD700"/>} 
-                            onClick={() => onConnect('alby')}
-                        >
-                            Connect Alby
-                        </Button>
-                        
-                        <Button 
-                            w="full" 
-                            size="lg" 
-                            leftIcon={<FaEthereum color="#3C3C3D"/>} 
-                            onClick={() => onConnect('metamask')}
-                        >
-                            Connect MetaMask
-                        </Button>
-
-                        <Divider py={2} />
-                        
                         <FormControl>
-                            <FormLabel fontSize="sm" color="gray.500">Or use Lightning Address</FormLabel>
+                            <FormLabel fontSize="sm" color="gray.500">Lightning Address</FormLabel>
                             <Flex gap={2}>
                                 <Input 
                                     placeholder="user@getalby.com" 

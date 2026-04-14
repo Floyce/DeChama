@@ -22,7 +22,13 @@ import {
     TabPanels,
     Tab,
     TabPanel,
-    Spinner
+    Spinner,
+    Table,
+    Thead,
+    Tr,
+    Th,
+    Tbody,
+    Td
 } from '@chakra-ui/react'
 import { FaPlus, FaSearch, FaArrowRight, FaWallet, FaUserFriends, FaPiggyBank, FaBookOpen, FaChartLine, FaBell, FaCrown } from 'react-icons/fa'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
@@ -32,21 +38,48 @@ import Tutorial from '../components/Tutorial'
 
 const Dashboard = () => {
     const { isConnected, displayName, myChamas, setActiveChama, balance, fetchMyChamas, address, formatCurrency, preferredDisplay, setPreferredDisplay } = useWallet()
-    const { user } = useAuth()
+    const { user, loginRef } = useAuth()
     const navigate = useNavigate()
     const cardBg = useColorModeValue('white', 'gray.800')
 
     const [stats, setStats] = useState({ total_savings_sats: 0, active_groups: 0, payouts_received_sats: 0 })
-    const [chamaHub, setChamaHub] = useState({ joined: [], available: [] })
+    const [chamaHub, setChamaHub] = useState({ joined: [], pending: [], available: [] })
     const [transactions, setTransactions] = useState([])
     const [isLoadingHub, setIsLoadingHub] = useState(true)
     const [showTutorial, setShowTutorial] = useState(false)
+    const [timeLeft, setTimeLeft] = useState({ days: 12, hours: 14, mins: 45, secs: 30 })
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                let { days, hours, mins, secs } = prev
+                if (secs > 0) secs--
+                else {
+                    secs = 59
+                    if (mins > 0) mins--
+                    else {
+                        mins = 59
+                        if (hours > 0) hours--
+                        else {
+                            hours = 23
+                            if (days > 0) days--
+                        }
+                    }
+                }
+                return { days, hours, mins, secs }
+            })
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [])
 
     // Fix 6: Fetch Real Stats
     const fetchStats = async () => {
-        if (user?.id) {
+        const token = localStorage.getItem('impactchain_token')
+        if (user?.id && token) {
             try {
-                const res = await fetch(`/api/user/stats?user_id=${user.id}`)
+                const res = await fetch(`/api/user/stats?user_id=${user.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                 if (res.ok) {
                     const data = await res.json()
                     setStats(data)
@@ -58,10 +91,13 @@ const Dashboard = () => {
     }
 
     const fetchChamaHub = async () => {
-        if (user?.id) {
+        const token = localStorage.getItem('impactchain_token')
+        if (user?.id && token) {
             setIsLoadingHub(true)
             try {
-                const res = await fetch(`/api/chamas/hub?user_id=${user.id}`)
+                const res = await fetch(`/api/chamas/hub?user_id=${user.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                 if (res.ok) {
                     const data = await res.json()
                     setChamaHub(data)
@@ -75,9 +111,12 @@ const Dashboard = () => {
     }
 
     const fetchTransactions = async () => {
-        if (user?.id) {
+        const token = localStorage.getItem('impactchain_token')
+        if (user?.id && token) {
             try {
-                const res = await fetch(`/api/transactions?user_id=${user.id}`)
+                const res = await fetch(`/api/transactions?user_id=${user.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                 if (res.ok) {
                     const data = await res.json()
                     setTransactions(data)
@@ -91,7 +130,7 @@ const Dashboard = () => {
     // Protect Route & Refresh Data
     useEffect(() => {
         if (!user && !isConnected) {
-            navigate('/auth')
+            navigate('/')
         } else {
             fetchChamaHub()
             fetchStats()
@@ -102,6 +141,15 @@ const Dashboard = () => {
             if (!hasSeenTutorial && user) {
                 setShowTutorial(true)
             }
+        }
+    }, [user, isConnected])
+
+    // Poll hub every 10s for real-time membership updates
+    useEffect(() => {
+        if (user && isConnected) {
+            fetchChamaHub()
+            const interval = setInterval(fetchChamaHub, 10000)
+            return () => clearInterval(interval)
         }
     }, [user, isConnected])
 
@@ -127,6 +175,9 @@ const Dashboard = () => {
                         <Text color="gray.500" fontSize="lg">
                             Manage your wealth and communities.
                         </Text>
+                        <Text fontSize="xs" fontFamily="mono" color="gray.400" mt={1}>
+                            Login Ref: {loginRef || 'N/A'}
+                        </Text>
                         {(user?.displayName || isConnected) && (
                             <HStack mt={2} spacing={2}>
                                 <Badge colorScheme="green" variant="subtle">
@@ -145,7 +196,7 @@ const Dashboard = () => {
                         py={3}
                         bg="orange.50"
                         cursor="pointer"
-                        onClick={() => setPreferredDisplay(preferredDisplay === 'BTC' ? 'KES' : 'BTC')}
+                        onClick={() => setPreferredDisplay(preferredDisplay === 'sats' ? 'kshs' : 'sats')}
                         _hover={{ bg: 'orange.100' }}
                     >
                         <Flex align="center" gap={4}>
@@ -153,8 +204,8 @@ const Dashboard = () => {
                             <Box>
                                 <Text fontSize="xs" color="gray.500" fontWeight="bold">TOTAL ASSETS (Fix 6)</Text>
                                 <Heading size="md" color="brand.600">
-                                    {preferredDisplay === 'BTC' 
-                                        ? `${(stats.total_savings_sats / 100000000).toFixed(6)} BTC` 
+                                    {preferredDisplay === 'sats' 
+                                        ? `${stats.total_savings_sats.toLocaleString()} sats` 
                                         : formatCurrency((stats.total_savings_sats / 100000000).toString()).local}
                                 </Heading>
                                 <Text fontSize="xs" color="gray.500">
@@ -178,7 +229,8 @@ const Dashboard = () => {
 
                 <Tabs variant="enclosed" colorScheme="purple" mb={12}>
                     <TabList>
-                        <Tab fontWeight="bold">Joined Chamas ({chamaHub.joined.length})</Tab>
+                        <Tab fontWeight="bold">My Chamas ({chamaHub.joined.length})</Tab>
+                        <Tab fontWeight="bold">Pending Requests ({chamaHub.pending.length})</Tab>
                         <Tab fontWeight="bold">Available Chamas ({chamaHub.available.length})</Tab>
                     </TabList>
                     <TabPanels>
@@ -235,6 +287,43 @@ const Dashboard = () => {
                                 </Card>
                             )}
                         </TabPanel>
+                        
+                        {/* Pending Tab */}
+                        <TabPanel px={0} py={6}>
+                            {isLoadingHub ? (
+                                <Flex justify="center" py={10}><Spinner color="purple.500" /></Flex>
+                            ) : chamaHub.pending.length > 0 ? (
+                                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+                                    {chamaHub.pending.map((chama: any) => (
+                                        <Card key={chama.id} bg="gray.50" opacity={0.8}>
+                                            <CardBody>
+                                                <Flex justify="space-between" align="start" mb={4}>
+                                                    <Icon as={FaClock} color="yellow.500" w={8} h={8} />
+                                                    <Badge colorScheme="yellow">PENDING APPROVAL</Badge>
+                                                </Flex>
+                                                <Heading size="md" mb={2}>{chama.name}</Heading>
+                                                <Text fontSize="sm" color="gray.500" mb={4}>Your join request is waiting for member approval.</Text>
+                                                <VStack align="stretch" spacing={2} mb={6}>
+                                                    <Flex justify="space-between" fontSize="xs" color="gray.600">
+                                                        <Text>Consensus Progress:</Text>
+                                                        <Text fontWeight="bold">{chama.approvals} / {chama.target_votes} Approval</Text>
+                                                    </Flex>
+                                                    <Progress 
+                                                        value={(chama.approvals / chama.target_votes) * 100} 
+                                                        size="xs" 
+                                                        colorScheme="yellow" 
+                                                        rounded="full" 
+                                                    />
+                                                </VStack>
+                                                <Button w="full" isDisabled variant="outline" borderColor="yellow.200">Pending Votes...</Button>
+                                            </CardBody>
+                                        </Card>
+                                    ))}
+                                </SimpleGrid>
+                            ) : (
+                                <Text color="gray.500" textAlign="center">No pending requests.</Text>
+                            )}
+                        </TabPanel>
                         <TabPanel px={0} py={6}>
                             {isLoadingHub ? (
                                 <Flex justify="center" py={10}><Spinner color="purple.500" /></Flex>
@@ -272,13 +361,13 @@ const Dashboard = () => {
                                                     </Flex>
                                                 </VStack>
 
-                                                <Button
+                                                 <Button
                                                     w="full"
-                                                    variant="outline"
+                                                    variant="solid"
                                                     colorScheme="purple"
-                                                    onClick={() => navigate(`/chama-dashboard/${chama.id}`)}
+                                                    onClick={() => navigate(`/browse-chamas`)}
                                                 >
-                                                    View Details
+                                                    Request to Join
                                                 </Button>
                                             </CardBody>
                                         </Card>
@@ -384,13 +473,23 @@ const Dashboard = () => {
                                     </Text>
                                     <HStack spacing={3} justify="center">
                                         <VStack spacing={0}>
-                                            <Text fontSize="2xl" fontWeight="bold" color="brand.600">12</Text>
+                                            <Text fontSize="2xl" fontWeight="bold" color="brand.600">{timeLeft.days}</Text>
                                             <Text fontSize="xs" color="gray.500">days</Text>
                                         </VStack>
                                         <Text fontSize="xl" color="gray.400">:</Text>
                                         <VStack spacing={0}>
-                                            <Text fontSize="2xl" fontWeight="bold" color="brand.600">14</Text>
+                                            <Text fontSize="2xl" fontWeight="bold" color="brand.600">{timeLeft.hours}</Text>
                                             <Text fontSize="xs" color="gray.500">hrs</Text>
+                                        </VStack>
+                                        <Text fontSize="xl" color="gray.400">:</Text>
+                                        <VStack spacing={0}>
+                                            <Text fontSize="2xl" fontWeight="bold" color="brand.600">{String(timeLeft.mins).padStart(2, '0')}</Text>
+                                            <Text fontSize="xs" color="gray.500">mins</Text>
+                                        </VStack>
+                                        <Text fontSize="xl" color="gray.400">:</Text>
+                                        <VStack spacing={0}>
+                                            <Text fontSize="2xl" fontWeight="bold" color="brand.600">{String(timeLeft.secs).padStart(2, '0')}</Text>
+                                            <Text fontSize="xs" color="gray.500">secs</Text>
                                         </VStack>
                                     </HStack>
                                     <Box bg="white" p={2} rounded="md" textAlign="center">
@@ -464,7 +563,7 @@ const Dashboard = () => {
                                             </Badge>
                                         </Td>
                                         <Td><Text fontSize="sm" fontWeight="medium">{tx.reason}</Text></Td>
-                                        <Td fontWeight="bold">{(tx.amount_sats / 100_000_000).toFixed(8)} BTC</Td>
+                                        <Td fontWeight="bold">{tx.amount_sats.toLocaleString()} sats</Td>
                                         <Td fontSize="xs" color="gray.500">{new Date(tx.created_at).toLocaleDateString()}</Td>
                                         <Td>
                                             <Badge colorScheme={tx.status === 'COMPLETED' ? 'green' : 'orange'}>

@@ -19,6 +19,7 @@ interface AuthContextType {
     login: (phoneNumber: string, password: string) => Promise<boolean>
     signup: (phoneNumber: string, password: string, displayName: string, referralCode?: string) => Promise<boolean>
     logout: () => void
+    loginRef: string | null
     logs: string[]
 }
 
@@ -27,16 +28,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null)
     const [token, setToken] = useState<string | null>(null)
+    const [loginRef, setLoginRef] = useState<string | null>(null)
     const [logs, setLogs] = useState<string[]>([])
     const toast = useToast()
 
     useEffect(() => {
         const savedUser = localStorage.getItem('impactchain_user')
         const savedToken = localStorage.getItem('impactchain_token')
+        const savedRef = localStorage.getItem('impactchain_login_ref')
         if (savedUser && savedToken) {
             setUser(JSON.parse(savedUser))
             setToken(savedToken)
         }
+        if (savedRef) setLoginRef(savedRef)
     }, [])
 
     const logAction = (action: string) => {
@@ -69,9 +73,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             setUser(userData)
             setToken(data.access_token)
+            const ref = 'IC-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase()
+            setLoginRef(ref)
             localStorage.setItem('impactchain_user', JSON.stringify(userData))
             localStorage.setItem('impactchain_token', data.access_token)
-            logAction(`User logged in: ${phoneNumber}`)
+            localStorage.setItem('impactchain_login_ref', ref)
+            logAction(`User logged in: ${phoneNumber} [Ref: ${ref}]`)
             toast({ title: 'Welcome back!', status: 'success', duration: 2000 })
             return true
         } catch (err) {
@@ -114,9 +121,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             setUser(userData)
             setToken(data.access_token)
+            const ref = 'IC-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase()
+            setLoginRef(ref)
             localStorage.setItem('impactchain_user', JSON.stringify(userData))
             localStorage.setItem('impactchain_token', data.access_token)
-            logAction(`New user registered: ${phoneNumber}`)
+            localStorage.setItem('impactchain_login_ref', ref)
+            logAction(`New user registered: ${phoneNumber} [Ref: ${ref}]`)
             toast({ title: 'Account Created!', status: 'success', duration: 2000 })
             return true
         } catch (err) {
@@ -131,11 +141,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setToken(null)
         localStorage.removeItem('impactchain_user')
         localStorage.removeItem('impactchain_token')
+        localStorage.removeItem('impactchain_login_ref')
         toast({ title: 'Logged out', status: 'info' })
+        window.location.href = '/'
     }
 
     return (
-        <AuthContext.Provider value={{ user, token, isAuthenticated: !!user, login, signup, logout, logs }}>
+        <AuthContext.Provider value={{ user, token, isAuthenticated: !!user, login, signup, logout, logs, loginRef }}>
             {children}
         </AuthContext.Provider>
     )

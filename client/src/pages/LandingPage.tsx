@@ -1,6 +1,6 @@
-import { Box, Container, Heading, Text, Button, SimpleGrid, Icon, VStack, Flex, useColorModeValue, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton, useDisclosure, Tabs, TabList, TabPanels, Tab, TabPanel, FormControl, FormLabel, Input, Checkbox, Link as ChakraLink, InputGroup, InputRightElement, IconButton } from '@chakra-ui/react'
+import { Box, Container, Heading, Text, Button, SimpleGrid, Icon, VStack, Flex, useColorModeValue, Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalCloseButton, useDisclosure, Tabs, TabList, TabPanels, Tab, TabPanel, FormControl, FormLabel, Input, Checkbox, Link as ChakraLink, InputGroup, InputRightElement, IconButton } from '@chakra-ui/react'
 import { FaBitcoin, FaHandshake, FaLock, FaUsers, FaPlus, FaArrowRight, FaEye, FaEyeSlash } from 'react-icons/fa'
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 
 import { useWallet } from '../context/WalletContext'
 import { useAuth } from '../context/AuthContext'
@@ -32,6 +32,8 @@ const LandingPage = () => {
     const { connectWallet, isConnected, myChamas, setActiveChama } = useWallet()
     const { login, signup, isAuthenticated } = useAuth()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const inviteChamaId = searchParams.get('chama')
     const { isOpen, onOpen, onClose } = useDisclosure()
     const { isOpen: isRedirectOpen, onOpen: onRedirectOpen, onClose: onRedirectClose } = useDisclosure()
 
@@ -53,7 +55,27 @@ const LandingPage = () => {
         setIsLoading(false)
         if (success) {
             onClose()
-            // Always redirect to dashboard
+            if (inviteChamaId) {
+                // Auto-join if invited
+                const userStr = localStorage.getItem('impactchain_user')
+                const token = localStorage.getItem('impactchain_token')
+                if (userStr && token) {
+                    const userObj = JSON.parse(userStr)
+                    fetch(`/api/chamas/${inviteChamaId}/requests`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                            'user-id': userObj.id
+                        },
+                        body: JSON.stringify({ 
+                            type: 'join',
+                            title: `Invited Member Join`,
+                            description: `Joining via invite link.`
+                        })
+                    })
+                }
+            }
             navigate('/dashboard')
         }
     }
@@ -65,6 +87,27 @@ const LandingPage = () => {
         setIsLoading(false)
         if (success) {
             onClose()
+            if (inviteChamaId) {
+                // Auto-join if invited (get user from localStorage since state might not be updated yet)
+                const userStr = localStorage.getItem('impactchain_user')
+                const token = localStorage.getItem('impactchain_token')
+                if (userStr && token) {
+                    const userObj = JSON.parse(userStr)
+                    fetch(`/api/chamas/${inviteChamaId}/requests`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                            'user-id': userObj.id
+                        },
+                        body: JSON.stringify({ 
+                            type: 'join',
+                            title: `Invited Member Join`,
+                            description: `Joining via invite link.`
+                        })
+                    })
+                }
+            }
             navigate('/dashboard')
         }
     }

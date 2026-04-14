@@ -6,7 +6,6 @@ import LearnPage from './pages/LearnPage'
 import Dashboard from './pages/Dashboard'
 import ContributionPage from './pages/ContributionPage'
 import GovernancePage from './pages/GovernancePage'
-import AuthPage from './pages/AuthPage'
 import CreateChamaPage from './pages/CreateChamaPage'
 import BrowseChamasPage from './pages/BrowseChamasPage'
 import ChamaDetails from './pages/ChamaDetails'
@@ -18,10 +17,6 @@ function App() {
     return (
         <Router>
             <Routes>
-                {/* Auth Routes */}
-                <Route path="/login" element={<AuthPage />} />
-                <Route path="/signup" element={<AuthPage />} />
-                <Route path="/auth" element={<AuthPage />} />
 
                 <Route path="/" element={<Layout />}>
                     <Route index element={<LandingPage />} />

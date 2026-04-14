@@ -37,7 +37,7 @@ const modules: Module[] = [
         title: 'What is Bitcoin?',
         desc: 'Bitcoin is decentralized digital money that no one controls. It is secure, scarce, and open to everyone.',
         content: [
-            'Bitcoin (BTC) was created in 2009 by Satoshi Nakamoto.',
+            'Bitcoin (sats) was created in 2009 by Satoshi Nakamoto.',
             'It is the first decentralized cryptocurrency, meaning no government or bank controls it.',
             'There will only ever be 21 million Bitcoins, making it scarce like digital gold.',
             'Transactions are recorded on a public ledger called the Blockchain.'

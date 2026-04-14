@@ -90,7 +90,7 @@ const Navbar = () => {
                                     color="gray.600"
                                     borderColor="gray.200"
                                 >
-                                    <option value="KES">🇰🇪 KES</option>
+                                    <option value="kshs">🇰🇪 kshs</option>
                                     <option value="USD">🇺🇸 USD</option>
                                     <option value="UGX">🇺🇬 UGX</option>
                                     <option value="TZS">🇹🇿 TZS</option>
@@ -117,8 +117,10 @@ const Navbar = () => {
                             )}
                             
                             <WalletConnectModal isOpen={isOpen} onClose={onClose} onConnect={(type, addr) => {
-                                if (type === 'ln_address' && addr) setDisplayName(addr);
-                                connectWallet();
+                                if (type === 'ln_address' && addr) {
+                                    setDisplayName(addr);
+                                    connectWallet(addr);
+                                }
                                 onClose();
                             }} />
 

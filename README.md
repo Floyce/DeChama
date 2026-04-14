@@ -1,65 +1,91 @@
-# ImpactChain: Because Trusting Your Cousin with the Money is So 2010.
+# ⚡ Impact Chain: Decentralized Community Savings
 
-Welcome to **ImpactChain**, the decentralized platform that takes the "drama" out of your "Chama", Okay, that was lame ASF. We are revolutionizing traditional savings circles (Chamas) by putting them on the blockchain. Why? Because math doesn't lie, but Chad from accounting might.
+Impact Chain is a state-of-the-art **Bitcoin-native ROSCA (Rotating Savings and Credit Association)** platform designed to empower communities through transparent, trustless, and automated financial governance. Built for the modern age, it replaces manual tracking and verbal trust with cryptographically secure smart-governance and Lightning Network payments.
 
-## What is this thing?
+---
 
-ImpactChain is a platform that lets you create, manage, and participate in savings circles using Bitcoin (via Stacks). It's transparent, secure, and ensures that when it's your turn to eat, the pot helps you feast, not famine.
+## 💎 Core Features
 
-We handle the messy stuff-ledger tracking, contribution windows, voting on loans-so you can focus on the important stuff: arguing about where to meet for lunch.
+### 🏢 Chama Hub & Governance
+- **Discovery Engine**: Browse active Chamas or launch your own community circle in seconds.
+- **51% Consensus Model**: Strict democratic governance. Membership, loans, and withdrawals require a majority vote to execute.
+- **Strict Access Control**: Dashboards are locked behind a membership wall. Only approved members can view balance, rotation orders, or transaction history.
 
-## User Flow Diagram
-![User Flow Diagram](docs/user-flow.png)
+### ⚡ Lightning-Native Finance
+- **Sats + KSH Display**: Dynamic currency bridging. View your savings in Bitcoin (Sats) and Kenyan Shillings (KSH) using real-time exchange rates.
+- **Automated Payouts**: The system automatically triggers rotation payouts to your saved Lightning address the moment the pool target is reached.
+- **Wallet of Satoshi Integration**: Seamlessly contribute via Lightning QR codes or deep-linking.
 
-## Key Features
+### 🛡️ Security & Transparency
+- **Unique Login References**: Every session generates a persistent IC-XXXX-XXXX tracking number for auditability.
+- **Proof-of-Payment**: Immutable digital receipts via Lightning payment hashes.
+- **Rotation Order**: Transparent join-date-based rotation ensures everyone knows exactly when their "payday" is coming.
 
-### Hybrid Authentication (The "Best of Both Worlds" Part)
-*   **Email & Password:** Log in like a normal person. No need to memorize 24 words just to see if your friends paid up.
-*   **Wallet Integration:** When money moves, we use real crypto wallets (Leather, Xverse). Secure, verifiable, and cooler than a bank app.
-*   **Referral System:** Bring your friends. If they behave, great. If not, at least you got a referral bonus.
+---
 
-### The Chama Wizard
-A 6-step wizard that holds your hand while you set up your empire... err, savings group.
-1.  **Basic Info:** Name your group something professional, or not. We don't judge.(We actually do)
-2.  **Members:** Invite the crew.
-3.  **Financial Rules:** Decide how much everyone pays and when.
-4.  **Loan Settings:** Want to lend money? Set the interest rates here.
-5.  **Governance:** Democracy is hard, but clicking "Vote" is easy.
-6.  **Deploy:** One click and your rules are etched in digital stone (smart contracts).
+## 🚀 Tech Stack
 
-### Dashboard of Truth
-*   **Real-time Overview:** See exactly how much money is in the pot.
-*   **Public Shame (sort of):** See who has paid and who is "Pending". Peer pressure is a powerful financial tool.
-*   **Activity Feed:** A verified history of everything that happened. No "I sent it yesterday" excuses.
+- **Frontend**: React (TypeScript), Chakra UI (Glassmorphism design), Framer Motion.
+- **Backend**: FastAPI (Python), SQLAlchemy (Async), Pydantic.
+- **Database**: PostgreSQL with strict relational constraints and indexing.
+- **Payments**: Lightning Network (LNbits / OpenNode compatible).
+- **Automation**: Async polling and state-machine transitions for governance approval.
 
-## Tech Stack (For the nerds)
-*   **Frontend:** React + TypeScript + Vite (Blazingly fast, obviously).
-*   **UI:** Chakra UI with a custom purple theme that looks expensive.
-*   **State:** React Context API (because Redux is too much paperwork).
-*   **Blockchain:** Stacks.js. Bitcoin security, smart contract flexibility.
+---
 
-## Getting Started
+## 🛠️ Setup & Installation
 
-1.  **Clone the repo:**
-    ```bash
-    git clone https://github.com/Floyce/DeChama.git
-    ```
+### 1. Prerequisites
+- Docker & Docker Compose
+- Node.js (v18+)
+- Python (3.9+)
 
-2.  **Install the goods:**
-    ```bash
-    cd client
-    npm install
-    ```
+### 2. Environment Variables
+Create a `.env` file in the `backend/` directory:
+```env
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/impactchain
+SECRET_KEY=your_super_secret_key
+LNBITS_API_KEY=your_lnbits_key
+LNBITS_URL=https://legend.lnbits.com
+```
 
-3.  **Run it:**
-    ```bash
-    npm run dev
-    ```
+### 3. Backend Setup
+```bash
+cd backend
+pip install -r requirements.txt
+python run_server.py
+```
 
-4.  **Profit.** (Or strictly speaking, save).
+### 4. Frontend Setup
+```bash
+cd client
+npm install
+npm run dev
+```
 
-## Contributing
-Found a bug? Want to fix my typo? PRs are welcome. Just don't break the money part.
+---
 
-## License
-MIT. Go wild.
+## 📦 Deployment
+
+### Backend (Cloud Run)
+1. Build the Docker image: `docker build -t gcr.io/impact-chain/backend .`
+2. Push and deploy to Google Cloud Run with appropriate env variables.
+
+### Frontend (Vercel)
+1. Connect GitHub repository.
+2. Set build command: `npm run build`.
+3. Set output directory: `dist`.
+
+---
+
+## 📜 Database Migrations
+To initialize the governance and request system:
+1. Run the `add_requests_tables.sql` located in `backend/sql/`.
+2. Ensure `chama_memberships` table has the `status` column for access control.
+
+---
+
+## 🤝 Contribution
+Impact Chain is open-source. Join us in building the future of decentralized community finance!
+
+**Developed by Antigravity AI for Floyce.**
