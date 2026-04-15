@@ -22,12 +22,15 @@ const ChamaDashboardPage = () => {
     const { isOpen: isRequestOpen, onOpen: onRequestOpen, onClose: onRequestClose } = useDisclosure()
 
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const [data, setData] = useState<any>(null)
     const [requests, setRequests] = useState<any[]>([])
     const [requestType, setRequestType] = useState<'loan' | 'withdrawal' | 'other'>('loan')
     const [requestForm, setRequestForm] = useState({ amount: '', title: '', description: '', reason: '' })
     const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)
     const [timeLeft, setTimeLeft] = useState({ days: 12, hours: 14, mins: 45, secs: 30 })
+
+    const API_BASE = "https://impact-chain-api-cthqcttxha-uc.a.run.app"
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -57,21 +60,45 @@ const ChamaDashboardPage = () => {
     const [transferAmount, setTransferAmount] = useState('')
 
     const fetchData = async () => {
-        const token = localStorage.getItem('impactchain_token')
-        if (!token) return
         setLoading(true)
+        setError(null)
+        const token = localStorage.getItem('impactchain_token')
+        
+        if (!token) {
+            toast({ title: 'Authentication required', status: 'error' })
+            navigate('/auth')
+            setLoading(false)
+            return
+        }
+
         try {
-            const res = await fetch(`/api/chamas/${id}/dashboard`, {
+            // First check if Chama exists using the specific endpoint requested
+            const checkRes = await fetch(`${API_BASE}/api/chamas/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            
+            if (!checkRes.ok) {
+                if (checkRes.status === 404) {
+                    setError('Chama not found')
+                    setLoading(false)
+                    return
+                }
+            }
+
+            // Fetch full dashboard data
+            const res = await fetch(`${API_BASE}/api/chamas/${id}/dashboard`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'user-id': user?.id || ''
                 }
             })
+
             if (res.ok) {
                 const json = await res.json()
                 setData(json)
+                
                 // Fetch requests
-                const reqRes = await fetch(`/api/chamas/${id}/requests`, {
+                const reqRes = await fetch(`${API_BASE}/api/chamas/${id}/requests`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 if (reqRes.ok) setRequests(await reqRes.json())
@@ -84,9 +111,11 @@ const ChamaDashboardPage = () => {
                 })
                 navigate('/dashboard')
             } else {
-                toast({ title: 'Error loading dashboard', status: 'error' })
+                setError('Failed to load dashboard data')
             }
         } catch (err) {
+            console.error("Dashboard Load Error:", err)
+            setError('Connection error: could not reach the server')
             toast({ title: 'Error loading dashboard', status: 'error' })
         } finally {
             setLoading(false)
@@ -94,13 +123,13 @@ const ChamaDashboardPage = () => {
     }
 
     useEffect(() => {
-        fetchData()
+        if (id) fetchData()
     }, [id])
 
     const generateInvoice = async () => {
         const token = localStorage.getItem('impactchain_token')
         try {
-            const res = await fetch('/api/contributions/create-invoice', {
+            const res = await fetch(`${API_BASE}/api/contributions/create-invoice`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -126,7 +155,7 @@ const ChamaDashboardPage = () => {
     const checkPayment = async () => {
         if (!paymentHash) return
         try {
-            const res = await fetch(`/api/contributions/check-payment/${paymentHash}`)
+            const res = await fetch(`${API_BASE}/api/contributions/check-payment/${paymentHash}`)
             const json = await res.json()
             if (json.status === 'paid') {
                 toast({ title: 'Payment Confirmed!', status: 'success' })
@@ -155,7 +184,7 @@ const ChamaDashboardPage = () => {
                 title: requestType === 'other' ? requestForm.title : `${requestType.toUpperCase()} Request`,
                 description: requestType === 'other' ? requestForm.description : requestForm.reason
             }
-            const res = await fetch(`/api/chamas/${id}/requests`, {
+            const res = await fetch(`${API_BASE}/api/chamas/${id}/requests`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -179,7 +208,7 @@ const ChamaDashboardPage = () => {
     const handleVote = async (requestId: string, vote: boolean) => {
         const token = localStorage.getItem('impactchain_token')
         try {
-            const res = await fetch(`/api/chamas/requests/${requestId}/vote`, {
+            const res = await fetch(`${API_BASE}/api/chamas/requests/${requestId}/vote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -201,7 +230,12 @@ const ChamaDashboardPage = () => {
     }
 
     if (loading) return <Flex justify="center" align="center" h="100vh"><Spinner color="purple.500" size="xl" /></Flex>
-    if (!data) return <Box p={10} textAlign="center"><Text>Chama not found.</Text></Box>
+    if (error || !data) return (
+        <Flex justify="center" align="center" h="100vh" direction="column" gap={4}>
+            <Heading size="lg" color="red.500">{error || 'Chama not found'}</Heading>
+            <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+        </Flex>
+    )
 
     const { chama, members, next_receiver, rotation_order } = data
     const progress = (chama.current_balance_sats / chama.target_goal_sats) * 100 || 0

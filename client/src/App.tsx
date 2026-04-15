@@ -30,7 +30,7 @@ function App() {
                     <Route path="create-chama" element={<CreateChamaPage />} />
                     <Route path="browse-chamas" element={<BrowseChamasPage />} />
                     <Route path="solo-savings" element={<SoloSavingsPage />} />
-                    <Route path="chama-dashboard/:id" element={<ChamaDashboardPage />} />
+                    <Route path="/chama-dashboard/:id" element={<ChamaDashboardPage />} />
                     <Route path="welcome" element={<WelcomePage />} />
                 </Route>
             </Routes>
