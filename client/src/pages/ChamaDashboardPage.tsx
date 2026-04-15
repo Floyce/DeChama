@@ -64,41 +64,42 @@ const ChamaDashboardPage = () => {
         setError(null)
         const token = localStorage.getItem('impactchain_token')
         
+        console.log("DEBUG: Fetching Dashboard for ID:", id)
+        console.log("DEBUG: Token found:", !!token)
+
         if (!token) {
-            toast({ title: 'Authentication required', status: 'error' })
+            console.warn("DEBUG: No token found, redirecting to auth")
             navigate('/auth')
             setLoading(false)
             return
         }
 
         try {
-            // First check if Chama exists using the specific endpoint requested
-            const checkRes = await fetch(`${API_BASE}/api/chamas/${id}`, {
+            // Use relative path to leverage Vercel Proxy
+            const checkRes = await fetch(`/api/chamas/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             
-            if (!checkRes.ok) {
-                if (checkRes.status === 404) {
-                    setError('Chama not found')
-                    setLoading(false)
-                    return
-                }
+            if (!checkRes.ok && checkRes.status === 404) {
+                setError('Chama not found')
+                setLoading(false)
+                return
             }
 
-            // Fetch full dashboard data
-            const res = await fetch(`${API_BASE}/api/chamas/${id}/dashboard`, {
+            const res = await fetch(`/api/chamas/${id}/dashboard`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'user-id': user?.id || ''
                 }
             })
 
+            console.log("DEBUG: Dashboard Response Status:", res.status)
+
             if (res.ok) {
                 const json = await res.json()
                 setData(json)
                 
-                // Fetch requests
-                const reqRes = await fetch(`${API_BASE}/api/chamas/${id}/requests`, {
+                const reqRes = await fetch(`/api/chamas/${id}/requests`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 if (reqRes.ok) setRequests(await reqRes.json())
@@ -111,12 +112,12 @@ const ChamaDashboardPage = () => {
                 })
                 navigate('/dashboard')
             } else {
-                setError('Failed to load dashboard data')
+                const errJson = await res.json().catch(() => ({}))
+                setError(`Error ${res.status}: ${errJson.detail || 'Failed to load dashboard'}`)
             }
-        } catch (err) {
-            console.error("Dashboard Load Error:", err)
-            setError('Connection error: could not reach the server')
-            toast({ title: 'Error loading dashboard', status: 'error' })
+        } catch (err: any) {
+            console.error("DEBUG: Dashboard Load Error Details:", err)
+            setError(`Connection error: ${err.message || 'Check your internet or server status'}`)
         } finally {
             setLoading(false)
         }
@@ -129,7 +130,7 @@ const ChamaDashboardPage = () => {
     const generateInvoice = async () => {
         const token = localStorage.getItem('impactchain_token')
         try {
-            const res = await fetch(`${API_BASE}/api/contributions/create-invoice`, {
+            const res = await fetch(`/api/contributions/create-invoice`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -155,7 +156,7 @@ const ChamaDashboardPage = () => {
     const checkPayment = async () => {
         if (!paymentHash) return
         try {
-            const res = await fetch(`${API_BASE}/api/contributions/check-payment/${paymentHash}`)
+            const res = await fetch(`/api/contributions/check-payment/${paymentHash}`)
             const json = await res.json()
             if (json.status === 'paid') {
                 toast({ title: 'Payment Confirmed!', status: 'success' })
@@ -184,7 +185,7 @@ const ChamaDashboardPage = () => {
                 title: requestType === 'other' ? requestForm.title : `${requestType.toUpperCase()} Request`,
                 description: requestType === 'other' ? requestForm.description : requestForm.reason
             }
-            const res = await fetch(`${API_BASE}/api/chamas/${id}/requests`, {
+            const res = await fetch(`/api/chamas/${id}/requests`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -208,7 +209,7 @@ const ChamaDashboardPage = () => {
     const handleVote = async (requestId: string, vote: boolean) => {
         const token = localStorage.getItem('impactchain_token')
         try {
-            const res = await fetch(`${API_BASE}/api/chamas/requests/${requestId}/vote`, {
+            const res = await fetch(`/api/chamas/requests/${requestId}/vote`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
