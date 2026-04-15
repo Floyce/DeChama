@@ -423,7 +423,7 @@ async def get_chama_dashboard(chama_id: str, user_id: str = Depends(get_auth_use
         .order_by(models.Payout.executed_at.desc())
         .limit(1)
     )
-    last_payout_date = last_payout_res.scalar() or datetime.datetime(2020, 1, 1)
+    last_payout_date = last_payout_res.scalar() or datetime(2020, 1, 1)
 
     # Rotation logic & Detailed member contribution stats
     members_result = await db.execute(
